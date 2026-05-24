@@ -1,8 +1,14 @@
 import difflib
 
 
-def split_paragraphs(text: str) -> list[str]:
-    return [p.strip() for p in text.split("\n\n") if p.strip()]
+def split_paragraphs(text: str, min_words: int = 20) -> list[str]:
+    """
+    Split on double newlines and drop short paragraphs.
+    min_words filters out page headers, section titles, and other noise
+    that edgartools includes in extracted text (e.g. 'Apple Inc. | 2024 Form 10-K | 11').
+    """
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    return [p for p in paragraphs if len(p.split()) >= min_words]
 
 
 def compute_diff(old_text: str, new_text: str) -> dict:

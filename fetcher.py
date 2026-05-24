@@ -1,5 +1,10 @@
 import time
-from edgar import Company
+from edgar import Company, set_identity
+from dotenv import load_dotenv
+import os
+
+load_dotenv()
+set_identity(f"Mitchell Magid {os.getenv('USER_EMAIL', 'mitchell.magid@gmail.com')}")
 
 RATE_LIMIT_DELAY = 0.11  # SEC enforces 10 req/sec hard limit
 
@@ -23,9 +28,22 @@ def extract_sections(filing) -> dict:
         "filing_date": str(filing.filing_date),
         "accession_number": str(filing.accession_number),
         "item_1a": _to_str(getattr(doc, "risk_factors", None)),
-        "item_7": _to_str(getattr(doc, "management_discussion_and_analysis", None)),
-        "item_3": _to_str(getattr(doc, "legal_proceedings", None)),
+        "item_7": _to_str(getattr(doc, "management_discussion", None)),
+        "item_3": _get_item_3(doc),
     }
+
+
+def _get_item_3(doc) -> str:
+    """Item 3 (Legal Proceedings) has no dedicated attribute — find it via items dict."""
+    try:
+        items = doc.items
+        # try common key formats
+        for key in ["Item 3", "item_3", "3", "Item 3."]:
+            if key in items:
+                return _to_str(items[key])
+    except Exception:
+        pass
+    return ""
 
 
 def _to_str(value) -> str:

@@ -1,4 +1,4 @@
 edgartools
-google-generativeai
+google-genai
 supabase
 python-dotenv

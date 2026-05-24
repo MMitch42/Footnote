@@ -10,7 +10,7 @@ Two pipeline modes:
     — used on first user lookup to populate historical data
 """
 
-import edgar as edgar_client
+import fetcher as edgar_client
 import db
 from diff import compute_diff, filter_scorable
 from scoring import score_all
@@ -18,7 +18,7 @@ from scoring import score_all
 SECTIONS = ["item_1a", "item_7", "item_3"]
 
 
-def alert_mode(ticker: str, form: str = "10-K") -> dict:
+def alert_mode(ticker: str, form: str = "10-K", sections: list = None) -> dict:
     """
     Compare the two most recent filings for a ticker.
     Returns scored diffs for all three sections.
@@ -33,8 +33,9 @@ def alert_mode(ticker: str, form: str = "10-K") -> dict:
     db.upsert_filing(ticker, form, new_filing)
     db.upsert_filing(ticker, form, old_filing)
 
+    run_sections = sections or SECTIONS
     results = {}
-    for section in SECTIONS:
+    for section in run_sections:
         cached = db.get_diff(ticker, form, new_filing["filing_date"], old_filing["filing_date"], section)
         if cached:
             results[section] = cached
