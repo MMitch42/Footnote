@@ -1,0 +1,4 @@
+edgartools
+google-generativeai
+supabase
+python-dotenv
