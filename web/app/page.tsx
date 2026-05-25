@@ -21,11 +21,22 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
 
-  const handleWaitlist = (e: React.FormEvent) => {
+  const handleWaitlist = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email.trim()) {
-      window.location.href = `mailto:support.riichicam@gmail.com?subject=Footnote waitlist&body=Please add me to the waitlist: ${email.trim()}`;
-      setSubmitted(true);
+    if (!email.trim()) return;
+    try {
+      const res = await fetch("/api/waitlist", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim() }),
+      });
+      if (res.ok) {
+        setSubmitted(true);
+      } else {
+        console.error("Waitlist error", await res.text());
+      }
+    } catch (err) {
+      console.error("Waitlist fetch failed", err);
     }
   };
   const router = useRouter();
