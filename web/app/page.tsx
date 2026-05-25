@@ -18,6 +18,16 @@ const DEMO = {
 
 export default function Home() {
   const [ticker, setTicker] = useState("");
+  const [email, setEmail] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+
+  const handleWaitlist = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (email.trim()) {
+      window.location.href = `mailto:support.riichicam@gmail.com?subject=Footnote waitlist&body=Please add me to the waitlist: ${email.trim()}`;
+      setSubmitted(true);
+    }
+  };
   const router = useRouter();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -100,19 +110,18 @@ export default function Home() {
                 <span className="text-slate-300">·</span>
                 <span className="text-sm text-slate-500">{DEMO.section}</span>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-semibold px-2 py-1 rounded-md bg-rose-100 text-rose-700">
+              <div className="flex items-center gap-3">
+                <span className="flex items-center gap-1.5 text-xs text-slate-400">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 inline-block" />
                   escalating
                 </span>
-                <span className="text-xs font-bold px-2 py-1 rounded-md bg-rose-600 text-white">
-                  {DEMO.score}/10
-                </span>
+                <span className="text-sm font-bold text-red-700">{DEMO.score}/10</span>
               </div>
             </div>
 
             {/* Removed */}
-            <div className="px-5 py-4 bg-rose-50 border-b border-rose-100">
-              <p className="text-xs font-semibold text-rose-400 uppercase tracking-widest mb-2">
+            <div className="px-5 py-4 bg-red-50 border-b border-slate-100 border-l-4 border-l-red-400">
+              <p className="text-xs font-medium text-red-400 uppercase tracking-widest mb-2">
                 2025 — Removed
               </p>
               <p className="text-sm text-slate-600 leading-relaxed font-mono line-through decoration-rose-300">
@@ -121,8 +130,8 @@ export default function Home() {
             </div>
 
             {/* Added */}
-            <div className="px-5 py-4 bg-emerald-50 border-b border-emerald-100">
-              <p className="text-xs font-semibold text-emerald-600 uppercase tracking-widest mb-2">
+            <div className="px-5 py-4 bg-emerald-50 border-b border-slate-100 border-l-4 border-l-emerald-500">
+              <p className="text-xs font-medium text-emerald-600 uppercase tracking-widest mb-2">
                 2026 — Added
               </p>
               <p className="text-sm text-slate-700 leading-relaxed font-mono">
@@ -130,10 +139,10 @@ export default function Home() {
               </p>
             </div>
 
-            {/* Explanation */}
-            <div className="px-5 py-4 bg-indigo-50 flex gap-3">
-              <span className="text-xs font-bold text-indigo-400 uppercase tracking-widest mt-0.5 shrink-0">
-                Footnote
+            {/* Analysis */}
+            <div className="px-5 py-4 bg-slate-50 flex gap-3">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-widest mt-0.5 shrink-0 w-16">
+                Analysis
               </span>
               <p className="text-sm text-slate-600 leading-relaxed">
                 {DEMO.explanation}
@@ -142,28 +151,40 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Pricing callout */}
-        <div className="border-t border-slate-100 py-14 flex items-start justify-between gap-12">
-          <div className="max-w-lg">
-            <p className="text-sm text-slate-400 mb-2">
-              Institutional research platforms charge up to $15,000/year for
-              this signal.
+        {/* Waitlist */}
+        <div className="border-t border-slate-100 py-14">
+          <div className="max-w-xl">
+            <p className="text-sm text-slate-400 mb-1">
+              Institutional research platforms charge up to $15,000/year for this signal.
             </p>
-            <p className="text-2xl font-bold text-slate-900 leading-snug">
+            <p className="text-2xl font-bold text-slate-900 mb-6">
               Footnote delivers it at{" "}
               <span className="text-indigo-600">$29/month.</span>
             </p>
-          </div>
-          <div className="shrink-0 flex flex-col gap-2 text-right">
-            <a
-              href="mailto:mitchell.magid@gmail.com?subject=Footnote early access"
-              className="inline-block px-6 py-3 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 transition-colors"
-            >
-              Get early access
-            </a>
-            <p className="text-xs text-slate-400">
-              No credit card required.
-            </p>
+
+            {submitted ? (
+              <p className="text-sm text-emerald-600 font-medium">
+                You&apos;re on the list. We&apos;ll be in touch.
+              </p>
+            ) : (
+              <form onSubmit={handleWaitlist} className="flex gap-2">
+                <input
+                  type="email"
+                  required
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="flex-1 max-w-xs px-4 py-2.5 text-sm border border-slate-300 rounded-lg bg-white text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+                <button
+                  type="submit"
+                  className="px-5 py-2.5 bg-slate-900 text-white text-sm font-semibold rounded-lg hover:bg-slate-700 transition-colors whitespace-nowrap"
+                >
+                  Join waitlist
+                </button>
+              </form>
+            )}
+            <p className="text-xs text-slate-400 mt-2">No credit card required. Early access pricing locked in.</p>
           </div>
         </div>
       </div>
