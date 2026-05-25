@@ -2,3 +2,5 @@ edgartools
 google-genai
 supabase
 python-dotenv
+fastapi
+uvicorn
