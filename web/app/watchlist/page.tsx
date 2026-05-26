@@ -19,6 +19,7 @@ const THRESHOLD_LABELS: Record<number, string> = {
 export default function WatchlistPage() {
   const [items, setItems] = useState<WatchedTicker[]>([]);
   const [loading, setLoading] = useState(true);
+  const [plan, setPlan] = useState<"free" | "pro">("free");
   const [addTicker, setAddTicker] = useState("");
   const [addThreshold, setAddThreshold] = useState(7);
   const [adding, setAdding] = useState(false);
@@ -26,8 +27,15 @@ export default function WatchlistPage() {
 
   const fetchWatchlist = async () => {
     try {
-      const res = await fetch("/api/watchlist");
-      if (res.ok) setItems(await res.json());
+      const [wRes, sRes] = await Promise.all([
+        fetch("/api/watchlist"),
+        fetch("/api/subscription"),
+      ]);
+      if (wRes.ok) setItems(await wRes.json());
+      if (sRes.ok) {
+        const s = await sRes.json();
+        setPlan(s.plan ?? "free");
+      }
     } finally {
       setLoading(false);
     }
@@ -91,36 +99,53 @@ export default function WatchlistPage() {
 
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
 
-        {/* Add form */}
-        <div>
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-4">Add ticker</p>
-          <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
-            <input
-              type="text"
-              value={addTicker}
-              onChange={(e) => setAddTicker(e.target.value)}
-              placeholder="AAPL, MSFT, BA…"
-              className="h-10 px-3 bg-bg-surface border border-bg-border rounded text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors w-44"
-            />
-            <select
-              value={addThreshold}
-              onChange={(e) => setAddThreshold(Number(e.target.value))}
-              className="h-10 px-3 bg-bg-surface border border-bg-border rounded text-sm text-text-secondary focus:outline-none focus:border-accent transition-colors"
+        {/* Add form — pro only */}
+        {plan === "pro" ? (
+          <div>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-4">Add ticker</p>
+            <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
+              <input
+                type="text"
+                value={addTicker}
+                onChange={(e) => setAddTicker(e.target.value)}
+                placeholder="AAPL, MSFT, BA…"
+                className="h-10 px-3 bg-bg-surface border border-bg-border rounded text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors w-44"
+              />
+              <select
+                value={addThreshold}
+                onChange={(e) => setAddThreshold(Number(e.target.value))}
+                className="h-10 px-3 bg-bg-surface border border-bg-border rounded text-sm text-text-secondary focus:outline-none focus:border-accent transition-colors"
+              >
+                <option value={4}>Alert: Notable (4+)</option>
+                <option value={7}>Alert: High (7+)</option>
+                <option value={9}>Alert: Critical (9+)</option>
+              </select>
+              <button
+                type="submit"
+                disabled={adding}
+                className="h-10 px-5 bg-text-primary text-bg-base text-sm font-semibold rounded hover:bg-text-primary/90 transition-colors disabled:opacity-50"
+              >
+                {adding ? "Adding…" : "Watch →"}
+              </button>
+            </form>
+            {error && <p className="text-xs text-diff-rem-text mt-2">{error}</p>}
+          </div>
+        ) : !loading ? (
+          <div className="rounded-xl border border-accent/30 bg-accent/5 px-6 py-6 flex items-start justify-between gap-6">
+            <div>
+              <p className="text-sm font-semibold text-text-primary mb-1">Footnote Pro — $9/month <span className="text-text-muted font-normal text-xs">early access</span></p>
+              <p className="text-sm text-text-secondary leading-relaxed max-w-sm">
+                Add tickers and get emailed the moment a company quietly rewrites a risk factor or litigation disclosure.
+              </p>
+            </div>
+            <Link
+              href="/upgrade"
+              className="shrink-0 h-9 px-5 flex items-center bg-accent text-bg-base text-sm font-semibold rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap"
             >
-              <option value={4}>Alert: Notable (4+)</option>
-              <option value={7}>Alert: High (7+)</option>
-              <option value={9}>Alert: Critical (9+)</option>
-            </select>
-            <button
-              type="submit"
-              disabled={adding}
-              className="h-10 px-5 bg-text-primary text-bg-base text-sm font-semibold rounded hover:bg-text-primary/90 transition-colors disabled:opacity-50"
-            >
-              {adding ? "Adding…" : "Watch →"}
-            </button>
-          </form>
-          {error && <p className="text-xs text-diff-rem-text mt-2">{error}</p>}
-        </div>
+              Upgrade →
+            </Link>
+          </div>
+        ) : null}
 
         {/* List */}
         <div>

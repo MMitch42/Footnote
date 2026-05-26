@@ -26,6 +26,16 @@ export async function POST(req: Request) {
   if (!ticker) return Response.json({ error: "ticker required" }, { status: 400 });
 
   const sb = createServerClient();
+
+  // Gate on pro subscription
+  const { data: sub } = await sb
+    .from("subscriptions")
+    .select("plan")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (!sub || sub.plan !== "pro") {
+    return Response.json({ error: "Pro subscription required" }, { status: 403 });
+  }
   const { data, error } = await sb
     .from("watchlist")
     .upsert(

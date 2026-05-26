@@ -217,7 +217,7 @@ export default function Home() {
               language underperform by 22% annually. Institutional research platforms charge up to
               $15,000/year for this signal.
             </p>
-            <p className="text-base font-semibold text-accent mt-5">Footnote: $29/month.</p>
+            <p className="text-base font-semibold text-accent mt-5">Footnote: $9/month, early access.</p>
           </div>
         </div>
 
