@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 
 const FEATURES = [
   "Watchlist: track up to 50 tickers",
@@ -16,6 +17,7 @@ export default function UpgradePage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
+  const { isSignedIn, isLoaded } = useUser();
 
   const handleUpgrade = async () => {
     setLoading(true);
@@ -86,13 +88,22 @@ export default function UpgradePage() {
           </div>
 
           {/* CTA */}
-          <button
-            onClick={handleUpgrade}
-            disabled={loading}
-            className="w-full h-12 bg-accent text-bg-base font-semibold text-sm rounded-lg hover:bg-accent-bright transition-colors disabled:opacity-60 font-mono tracking-wide"
-          >
-            {loading ? "Redirecting to checkout…" : "Get early access for $9/month →"}
-          </button>
+          {isLoaded && !isSignedIn ? (
+            <a
+              href={`/sign-in?redirect_url=/upgrade`}
+              className="w-full h-12 bg-accent text-bg-base font-semibold text-sm rounded-lg hover:bg-accent-bright transition-colors font-mono tracking-wide flex items-center justify-center"
+            >
+              Sign in to subscribe →
+            </a>
+          ) : (
+            <button
+              onClick={handleUpgrade}
+              disabled={loading || !isLoaded}
+              className="w-full h-12 bg-accent text-bg-base font-semibold text-sm rounded-lg hover:bg-accent-bright transition-colors disabled:opacity-60 font-mono tracking-wide"
+            >
+              {loading ? "Redirecting to checkout…" : "Get early access for $9/month →"}
+            </button>
+          )}
           {error && <p className="text-xs text-diff-rem-text mt-3 text-center">{error}</p>}
 
           <p className="text-xs text-text-muted text-center mt-4">
