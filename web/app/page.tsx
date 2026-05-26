@@ -1,8 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
+
+function useInView(threshold = 0.12) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([e]) => { if (e.isIntersecting) { setInView(true); obs.disconnect(); } },
+      { threshold }
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, []);
+  return { ref, inView };
+}
 
 const COMPANY_TICKERS: Record<string, string> = {
   "apple": "AAPL", "microsoft": "MSFT", "nvidia": "NVDA", "amazon": "AMZN",
@@ -44,11 +60,48 @@ const STEPS = [
   { n: "03", title: "Get alerted when something changes.", body: "Set a novelty threshold. We email you the moment a company quietly rewrites a risk factor or litigation disclosure." },
 ];
 
+const HEADLINE = "The signal\nin the filings.";
+
 export default function Home() {
   const [ticker, setTicker] = useState("");
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const router = useRouter();
+
+  // Typewriter
+  const [typed, setTyped] = useState("");
+  const [typingDone, setTypingDone] = useState(false);
+  useEffect(() => {
+    let i = 0;
+    const id = setInterval(() => {
+      i++;
+      setTyped(HEADLINE.slice(0, i));
+      if (i >= HEADLINE.length) { setTypingDone(true); clearInterval(id); }
+    }, 38);
+    return () => clearInterval(id);
+  }, []);
+
+  // Counter for 188bps
+  const { ref: statsRef, inView: statsInView } = useInView();
+  const [bps, setBps] = useState(0);
+  useEffect(() => {
+    if (!statsInView) return;
+    const TARGET = 188;
+    const DURATION = 1000;
+    const start = performance.now();
+    const frame = (now: number) => {
+      const t = Math.min((now - start) / DURATION, 1);
+      const ease = 1 - Math.pow(1 - t, 3);
+      setBps(Math.round(ease * TARGET));
+      if (t < 1) requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }, [statsInView]);
+
+  // Scroll fade-in refs
+  const { ref: demoRef, inView: demoInView } = useInView();
+  const { ref: howRef, inView: howInView } = useInView();
+  const { ref: waitlistRef, inView: waitlistInView } = useInView();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -118,8 +171,8 @@ export default function Home() {
           style={{ background: "radial-gradient(ellipse 90% 60% at 50% -5%, rgba(245,158,11,0.09) 0%, transparent 65%)" }}
         />
         <div className="relative z-10 max-w-5xl mx-auto px-6 pt-20 pb-16">
-          <h1 className="font-mono text-4xl font-bold text-text-primary leading-tight mb-5 max-w-xl">
-            The signal<br />in the filings.
+          <h1 className="font-mono text-4xl font-bold text-text-primary leading-tight mb-5 max-w-xl whitespace-pre-line">
+            {typed}{!typingDone && <span className="text-accent animate-pulse">_</span>}
           </h1>
           <p className="text-base text-text-secondary leading-relaxed mb-10 max-w-lg">
             Footnote diffs consecutive SEC 10-K and 10-Q filings and scores every language change for
@@ -150,7 +203,7 @@ export default function Home() {
       <div className="max-w-5xl mx-auto px-6">
 
         {/* Live demo */}
-        <div className="mb-20">
+        <div ref={demoRef} className={`mb-20 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <div className="flex items-center gap-3 mb-4">
             <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Live example</span>
             <div className="h-px flex-1 bg-bg-border" />
@@ -171,7 +224,10 @@ export default function Home() {
                 <span className="text-text-secondary">{DEMO.dateNew}</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
+                <div className="relative w-1.5 h-1.5 shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
+                  {demoInView && <div className="absolute inset-0 rounded-full bg-[#f87171] animate-ping opacity-50" />}
+                </div>
                 <span className="font-mono text-xs font-semibold text-[#f87171]">9/10 Critical</span>
               </div>
             </div>
@@ -198,10 +254,10 @@ export default function Home() {
         </div>
 
         {/* Stats */}
-        <div className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10 mb-14">
+        <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10 mb-14">
           <div>
             <p className="font-mono text-5xl font-bold text-text-primary mb-1 tabular-nums">
-              188<span className="text-accent">bps</span>
+              {bps}<span className="text-accent">bps</span>
             </p>
             <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-4">per month, documented alpha</p>
             <p className="text-sm text-text-secondary leading-relaxed">
@@ -231,7 +287,7 @@ export default function Home() {
         </div>
 
         {/* How it works */}
-        <div className="border-t border-bg-border py-14 mb-14">
+        <div ref={howRef} className={`border-t border-bg-border py-14 mb-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-10">How it works</p>
           <div className="space-y-8 max-w-xl">
             {STEPS.map((step) => (
@@ -247,7 +303,7 @@ export default function Home() {
         </div>
 
         {/* Waitlist */}
-        <div id="waitlist" className="border-t border-bg-border py-14 mb-6">
+        <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 mb-6 transition-all duration-700 delay-150 ${waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <div className="max-w-lg">
             <p className="text-lg font-semibold text-text-primary mb-1">Not ready to subscribe?</p>
             <p className="text-sm text-text-muted mb-6">Leave your email and we&apos;ll let you know when new features ship. No credit card, no spam.</p>
