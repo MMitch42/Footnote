@@ -17,8 +17,8 @@ export default function Icon() {
           borderRadius: 8,
         }}
       >
-        <span style={{ color: "#f59e0b", fontSize: 18, fontWeight: 700, lineHeight: 1 }}>
-          ✦
+        <span style={{ color: "#f59e0b", fontSize: 13, fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1, fontFamily: "monospace" }}>
+          FN
         </span>
       </div>
     ),
