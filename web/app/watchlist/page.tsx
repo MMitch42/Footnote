@@ -18,7 +18,7 @@ function WatchlistContent() {
   const justUpgraded = searchParams.get("upgraded") === "true";
   const [items, setItems] = useState<WatchedTicker[]>([]);
   const [loading, setLoading] = useState(true);
-  const [plan, setPlan] = useState<"free" | "pro" | null>(null);
+  const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
   const [addTicker, setAddTicker] = useState("");
   const [addThreshold, setAddThreshold] = useState(7);
   const [adding, setAdding] = useState(false);

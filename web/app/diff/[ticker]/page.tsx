@@ -331,7 +331,7 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
   const selectedRowRef = useRef<HTMLButtonElement>(null);
   const [watching, setWatching] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
-  const [plan, setPlan] = useState<"free" | "pro">("free");
+  const [plan, setPlan] = useState<"free" | "pro" | "research">("free");
 
   useEffect(() => {
     fetch(`${API_URL}/alert/${ticker}`)

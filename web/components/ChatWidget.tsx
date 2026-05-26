@@ -18,7 +18,7 @@ export function ChatWidget() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
-  const [plan, setPlan] = useState<"free" | "pro" | null>(null);
+  const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { isSignedIn, isLoaded } = useUser();
@@ -44,7 +44,7 @@ export function ChatWidget() {
 
   // Focus input when opened
   useEffect(() => {
-    if (open && plan === "pro") {
+    if (open && (plan === "pro" || plan === "research")) {
       setTimeout(() => inputRef.current?.focus(), 50);
     }
   }, [open, plan]);
