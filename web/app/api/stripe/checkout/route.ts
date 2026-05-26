@@ -20,6 +20,9 @@ export async function POST() {
     ...(email ? { customer_email: email } : {}),
     success_url: `${appUrl}/watchlist?upgraded=true`,
     cancel_url: `${appUrl}/upgrade`,
+    consent_collection: {
+      terms_of_service: "required",
+    },
     metadata: { user_id: userId },
     subscription_data: {
       metadata: { user_id: userId },

@@ -217,7 +217,10 @@ export default function Home() {
               language underperform by 22% annually. Institutional research platforms charge up to
               $15,000/year for this signal.
             </p>
-            <p className="text-base font-semibold text-accent mt-5">Footnote: $9/month, early access.</p>
+            <p className="text-base font-semibold text-accent mt-5">
+              Footnote: $9/month, early access.{" "}
+              <span className="text-text-muted font-normal line-through text-sm">$29</span>
+            </p>
           </div>
         </div>
 
@@ -265,7 +268,20 @@ export default function Home() {
           </div>
         </div>
 
+      </div>{/* /max-w-5xl */}
+
+      {/* Footer */}
+      <div className="border-t border-bg-border py-8">
+        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between flex-wrap gap-4">
+          <span className="font-mono text-xs text-text-muted">© 2026 Mitchell Magid</span>
+          <div className="flex items-center gap-6">
+            <a href="/terms" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Terms</a>
+            <a href="/privacy" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Privacy</a>
+            <a href="mailto:mitchell.magid@gmail.com" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Contact</a>
+          </div>
+        </div>
       </div>
+
     </div>
   );
 }

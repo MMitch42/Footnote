@@ -92,6 +92,12 @@ export default function UpgradePage() {
           <p className="text-xs text-text-muted text-center mt-4">
             Cancel anytime. Card charged monthly.
           </p>
+          <p className="text-xs text-text-muted/50 text-center mt-3">
+            By subscribing you agree to our{" "}
+            <Link href="/terms" className="underline hover:text-text-muted transition-colors">Terms</Link>
+            {" "}and{" "}
+            <Link href="/privacy" className="underline hover:text-text-muted transition-colors">Privacy Policy</Link>.
+          </p>
 
         </div>
       </div>
