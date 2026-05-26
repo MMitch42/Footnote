@@ -474,8 +474,17 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
       )}
 
       {error && (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-text-muted">{error}</p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <p className="text-sm font-semibold text-text-primary">Could not load filing data</p>
+          <p className="text-xs text-text-muted max-w-sm leading-relaxed">
+            The analysis service may be temporarily unavailable. Check back in a moment.
+          </p>
+          <button
+            onClick={() => window.history.back()}
+            className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
+          >
+            Go back
+          </button>
         </div>
       )}
 
@@ -568,8 +577,19 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
       )}
 
       {data?.error && (
-        <div className="flex-1 flex items-center justify-center">
-          <p className="text-sm text-text-muted">{data.error}</p>
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+          <p className="text-sm font-semibold text-text-primary">No filings found for {ticker}</p>
+          <p className="text-xs text-text-muted max-w-sm leading-relaxed">
+            {data.error.includes("fewer than 2")
+              ? `${ticker} doesn't have enough filings on SEC EDGAR to generate a diff. This usually means the company recently went public or filed under a different ticker.`
+              : data.error}
+          </p>
+          <button
+            onClick={() => window.history.back()}
+            className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
+          >
+            Go back
+          </button>
         </div>
       )}
     </div>

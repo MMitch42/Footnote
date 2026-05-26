@@ -35,7 +35,7 @@ const STEPS = [
   { n: "03", title: "Get alerted when something changes.", body: "Set a novelty threshold. We email you the moment a company quietly rewrites a risk factor or litigation disclosure." },
 ];
 
-const HEADLINE = "The signal\nin the filings.";
+const HEADLINE = "Companies rewrite\ntheir filings.\nWe catch it.";
 
 export default function Home() {
   const [ticker, setTicker] = useState("");
@@ -196,8 +196,9 @@ export default function Home() {
             {typed}{!typingDone && <span className="text-accent animate-pulse">_</span>}
           </h1>
           <p className="text-base text-text-secondary leading-relaxed mb-10 max-w-lg">
-            Footnote diffs consecutive SEC 10-K and 10-Q filings and scores every language change for
-            semantic materiality. Know what companies quietly rewrote before the market reacts.
+            Every time a company files a new 10-K or 10-Q, Footnote compares it to the previous one.
+            Changed passages are scored for significance. When something material shifts in the risk factors,
+            MD&amp;A, or legal disclosures, you find out — before most people notice.
           </p>
 
           <div ref={searchRef} className="relative max-w-sm">
@@ -240,7 +241,7 @@ export default function Home() {
             )}
           </div>
           <p className="text-xs text-text-muted mt-2">
-            Any public company or ticker — 10,000+ SEC filers
+            Any public company — see exactly what changed in their last filing
           </p>
         </div>
       </div>
@@ -249,11 +250,14 @@ export default function Home() {
 
         {/* Live demo */}
         <div ref={demoRef} className={`mb-20 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Live example</span>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Real example</span>
             <div className="h-px flex-1 bg-bg-border" />
             <span className="font-mono text-xs text-text-muted">AAPL · 10-K · Item 1A</span>
           </div>
+          <p className="text-xs text-text-muted mb-4">
+            Apple rewrote this passage between their Nov 2024 and Oct 2025 annual filings. Footnote flagged it as a 9/10 critical change — here is what shifted and why it matters.
+          </p>
 
           <div className="rounded-xl border border-bg-border overflow-hidden">
             {/* Window chrome */}
@@ -333,7 +337,10 @@ export default function Home() {
 
         {/* How it works */}
         <div ref={howRef} className={`border-t border-bg-border py-14 mb-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
-          <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-10">How it works</p>
+          <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">How it works</p>
+          <p className="text-sm text-text-secondary mb-10 max-w-lg">
+            Built for investors, analysts, and anyone who tracks public companies. No more manually reading filings to see what changed.
+          </p>
           <div className="space-y-8 max-w-xl">
             {STEPS.map((step) => (
               <div key={step.n} className="flex gap-8">

@@ -45,6 +45,9 @@ export async function GET(req: Request) {
   }
 
   const { searchParams: sp } = new URL(req.url);
+  if (sp.get("debug") === "1") {
+    return Response.json({ ok: true, userId, email });
+  }
   const next = sp.get("next") ?? "/";
   return Response.redirect(new URL(next, req.url), 302);
 }
