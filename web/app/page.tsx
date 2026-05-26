@@ -198,7 +198,7 @@ export default function Home() {
           <p className="text-base text-text-secondary leading-relaxed mb-10 max-w-lg">
             Every time a company files a new 10-K or 10-Q, Footnote compares it to the previous one.
             Changed passages are scored for significance. When something material shifts in the risk factors,
-            MD&amp;A, or legal disclosures, you find out — before most people notice.
+            MD&amp;A, or legal disclosures, you find out. Usually before most people notice.
           </p>
 
           <div ref={searchRef} className="relative max-w-sm">
@@ -241,7 +241,7 @@ export default function Home() {
             )}
           </div>
           <p className="text-xs text-text-muted mt-2">
-            Any public company — see exactly what changed in their last filing
+            Any public company. See exactly what changed in their last filing.
           </p>
         </div>
       </div>
@@ -256,7 +256,7 @@ export default function Home() {
             <span className="font-mono text-xs text-text-muted">AAPL · 10-K · Item 1A</span>
           </div>
           <p className="text-xs text-text-muted mb-4">
-            Apple rewrote this passage between their Nov 2024 and Oct 2025 annual filings. Footnote flagged it as a 9/10 critical change — here is what shifted and why it matters.
+            Apple rewrote this passage between their Nov 2024 and Oct 2025 annual filings. Footnote flagged it as a 9/10 critical change. Here is what shifted and why it matters.
           </p>
 
           <div className="rounded-xl border border-bg-border overflow-hidden">

@@ -17,7 +17,27 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Footnote | SEC Filing Intelligence",
   description:
-    "Know when a company quietly changes what it tells investors. Footnote diffs consecutive SEC filings and scores every language change for semantic materiality.",
+    "Know when a company quietly changes what it tells investors. Footnote tracks SEC 10-K and 10-Q filings and alerts you when risk factors, MD&A, or legal disclosures shift.",
+  metadataBase: new URL("https://getfootnote.app"),
+  openGraph: {
+    title: "Footnote | SEC Filing Intelligence",
+    description:
+      "Know when a company quietly changes what it tells investors. Get alerted when risk factors, MD&A, or legal disclosures shift in a new SEC filing.",
+    url: "https://getfootnote.app",
+    siteName: "Footnote",
+    locale: "en_US",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Footnote | SEC Filing Intelligence",
+    description:
+      "Know when a company quietly changes what it tells investors. Get alerted when risk factors, MD&A, or legal disclosures shift in a new SEC filing.",
+  },
+  robots: {
+    index: true,
+    follow: true,
+  },
 };
 
 export default function RootLayout({
