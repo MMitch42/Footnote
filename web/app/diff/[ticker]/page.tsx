@@ -198,7 +198,7 @@ function BriefingPanel({
                 <div>
                   <p className="text-sm text-text-primary">{SECTION_FULL[key] ?? key}</p>
                   <p className="text-xs text-text-secondary mt-0.5">
-                    {sp.length} changes · {sHigh} high-novelty · {Math.round(d.change_ratio * 100)}% of section
+                    {sp.length} changes · {sHigh} high-novelty · {Math.min(Math.round(d.change_ratio * 100), 100)}% of section
                   </p>
                 </div>
                 <div className="flex gap-1.5 shrink-0">

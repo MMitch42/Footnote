@@ -32,10 +32,10 @@ const COMPANY_TICKERS: Record<string, string> = {
 };
 
 const DEMO = {
-  dateNew: "Jan 2026", dateOld: "Feb 2025",
-  explanation: "Boeing replaced generic program-risk language with specific disclosures naming the 777X and 737-7/737-10 programs, and explicitly stated the FAA certification process is ongoing and has experienced significant delays.",
-  old: "The commercial aircraft business is extremely complex, involving extensive coordination and integration with suppliers, highly-skilled labor performed by thousands of employees of ours and other partners, and stringent and evolving regulatory requirements and performance and reliability standards.",
-  new: "The introduction of new aircraft programs and/or derivatives, such as the 777X, 737-7 and 737-10, takes years and involves significant risks associated with meeting development, testing, certification, and production schedules. We follow the lead of the FAA as we work through the certification process, and we have experienced, and may continue to experience, significant delays.",
+  dateNew: "Oct 2025", dateOld: "Nov 2024",
+  explanation: "Apple replaced a general reference to past U.S.-China tensions with specific disclosures naming the 2025 tariff announcements, affected countries, and an active Section 232 semiconductor investigation. The shift from past-tense observation to present-tense enumeration of live regulatory actions is substantive.",
+  old: "For example, tensions between governments, including the U.S. and China, have in the past led to tariffs and other restrictions affecting the Company's business. If disputes and conflicts further escalate in the future, actions by governments in response could be significantly more severe and restrictive and could materially adversely affect the Company's business.",
+  new: "Beginning in the second quarter of 2025, new tariffs were announced on imports to the U.S. (\"U.S. Tariffs\"), including additional tariffs on imports from China, India, Japan, South Korea, Taiwan, Vietnam and the European Union (\"EU\"), among others. In response, several countries have imposed, or threatened to impose, reciprocal tariffs on imports from the U.S. and other retaliatory measures. Various modifications to the U.S. Tariffs have been announced and further changes could be made in the future, which may include additional sector-based tariffs or other measures. For example, the U.S. Department of Commerce has initiated an investigation under Section 232 of the Trade Expansion Act of 1962 into imports of semiconductors and their derivative products. The ultimate impact remains uncertain and will depend on whether additional U.S. Tariffs are imposed, to what extent other countries implement retaliatory measures, and the overall magnitude and duration of these measures.",
 };
 
 const STEPS = [
@@ -154,7 +154,7 @@ export default function Home() {
           <div className="flex items-center gap-3 mb-4">
             <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Live example</span>
             <div className="h-px flex-1 bg-bg-border" />
-            <span className="font-mono text-xs text-text-muted">BA · 10-K · Item 1A</span>
+            <span className="font-mono text-xs text-text-muted">AAPL · 10-K · Item 1A</span>
           </div>
 
           <div className="rounded-xl border border-bg-border overflow-hidden">
@@ -172,7 +172,7 @@ export default function Home() {
               </div>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
-                <span className="font-mono text-xs font-semibold text-[#f87171]">10/10 Critical</span>
+                <span className="font-mono text-xs font-semibold text-[#f87171]">9/10 Critical</span>
               </div>
             </div>
             {/* Removed */}
