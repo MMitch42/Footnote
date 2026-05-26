@@ -43,19 +43,20 @@ const SECTION_FULL: Record<string, string> = {
 
 function scoreCfg(score: number | null) {
   if (!score) return null;
-  if (score >= 9) return { cls: "bg-novelty-critical text-novelty-critical-text", label: "Critical" };
-  if (score >= 7) return { cls: "bg-novelty-high text-novelty-high-text",         label: "High" };
-  if (score >= 4) return { cls: "bg-novelty-medium text-novelty-medium-text",     label: "Notable" };
-  return           { cls: "bg-novelty-low text-novelty-low-text",                 label: "Low" };
+  if (score >= 9) return { dot: "bg-[#f87171]", text: "text-[#f87171]", label: "Critical" };
+  if (score >= 7) return { dot: "bg-accent",    text: "text-accent",    label: "High" };
+  if (score >= 4) return { dot: "bg-[#d97706]", text: "text-[#d97706]", label: "Notable" };
+  return           { dot: "bg-text-muted",   text: "text-text-muted",  label: "Low" };
 }
 
 function ScoreBadge({ score }: { score: number | null }) {
   const cfg = scoreCfg(score);
-  if (!cfg || !score) return <span className="text-xs text-text-muted">—</span>;
+  if (!cfg || !score) return <span className="font-mono text-xs text-text-muted/30">—</span>;
   return (
-    <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${cfg.cls}`}>
-      {score}/10 {cfg.label}
-    </span>
+    <div className="flex items-center gap-1.5 shrink-0">
+      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
+      <span className={`font-mono text-xs font-semibold tabular-nums ${cfg.text}`}>{score}/10</span>
+    </div>
   );
 }
 
@@ -124,15 +125,15 @@ function BriefingPanel({
       <div className="grid grid-cols-3 rounded-lg border border-bg-border divide-x divide-bg-border overflow-hidden">
         <div className="px-4 py-3">
           <p className="font-mono text-xl font-bold text-text-primary">{passages.length}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Changes</p>
+          <p className="text-[11px] text-text-secondary mt-0.5">Changes</p>
         </div>
         <div className="px-4 py-3">
-          <p className="font-mono text-xl font-bold text-novelty-high-text">{highPassages.length}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">High-novelty</p>
+          <p className="font-mono text-xl font-bold text-accent">{highPassages.length}</p>
+          <p className="text-[11px] text-text-secondary mt-0.5">High-novelty</p>
         </div>
         <div className="px-4 py-3">
           <p className={`font-mono text-xl font-bold ${verdictColor}`}>{verdict}</p>
-          <p className="text-[11px] text-text-muted mt-0.5">Direction</p>
+          <p className="text-[11px] text-text-secondary mt-0.5">Direction</p>
         </div>
       </div>
 
@@ -194,7 +195,7 @@ function BriefingPanel({
               <div key={key} className="px-4 py-3 flex items-center justify-between gap-4">
                 <div>
                   <p className="text-sm text-text-primary">{SECTION_FULL[key] ?? key}</p>
-                  <p className="text-xs text-text-muted mt-0.5">
+                  <p className="text-xs text-text-secondary mt-0.5">
                     {sp.length} changes · {sHigh} high-novelty · {Math.round(d.change_ratio * 100)}% of section
                   </p>
                 </div>
@@ -426,7 +427,7 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
               >
                 {watchLoading ? "…" : watching ? "★ Watching" : "☆ Watch"}
               </button>
-              <Link href="/watchlist" className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150">
+              <Link href="/watchlist" className="text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">
                 Watchlist
               </Link>
               <UserButton appearance={{ variables: { colorPrimary: "#f59e0b" }, elements: { avatarBox: "w-7 h-7" } }} />

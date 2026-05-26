@@ -82,7 +82,7 @@ export default function Home() {
             <Show when="signed-out">
               <a
                 href="/sign-in"
-                className="text-sm text-text-muted hover:text-text-secondary transition-colors duration-150"
+                className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
               >
                 Sign in
               </a>
@@ -96,7 +96,7 @@ export default function Home() {
             <Show when="signed-in">
               <a
                 href="/watchlist"
-                className="text-sm text-text-muted hover:text-text-secondary transition-colors duration-150"
+                className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
               >
                 Watchlist
               </a>
@@ -173,9 +173,10 @@ export default function Home() {
                 <span className="text-accent">→</span>
                 <span className="text-text-secondary">{DEMO.dateNew}</span>
               </div>
-              <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded bg-novelty-critical text-novelty-critical-text">
-                10/10 Critical
-              </span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
+                <span className="font-mono text-xs font-semibold text-[#f87171]">10/10 Critical</span>
+              </div>
             </div>
             {/* Removed */}
             <div className="flex border-b border-bg-border/50">
