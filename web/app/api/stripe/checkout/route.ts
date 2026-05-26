@@ -2,18 +2,23 @@ import { auth } from "@clerk/nextjs/server";
 import { clerkClient } from "@clerk/nextjs/server";
 import { stripe } from "@/lib/stripe";
 
-export async function POST() {
+export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
 
-  const priceId = process.env.STRIPE_PRICE_ID;
+  const { tier = "pro" } = await req.json().catch(() => ({ tier: "pro" }));
+  const isResearch = tier === "research";
+
+  const priceId = isResearch
+    ? process.env.STRIPE_RESEARCH_PRICE_ID
+    : process.env.STRIPE_PRICE_ID;
+
   if (!priceId) {
-    console.error("STRIPE_PRICE_ID is not set");
+    console.error(`${isResearch ? "STRIPE_RESEARCH_PRICE_ID" : "STRIPE_PRICE_ID"} is not set`);
     return Response.json({ error: "Checkout not configured" }, { status: 500 });
   }
 
   try {
-    // Get the user's email to pre-fill Stripe checkout
     const clerk = await clerkClient();
     const user = await clerk.users.getUser(userId);
     const email = user.emailAddresses[0]?.emailAddress;
@@ -27,9 +32,9 @@ export async function POST() {
       ...(email ? { customer_email: email } : {}),
       success_url: `${appUrl}/watchlist?upgraded=true`,
       cancel_url: `${appUrl}/upgrade`,
-      metadata: { user_id: userId },
+      metadata: { user_id: userId, tier },
       subscription_data: {
-        metadata: { user_id: userId },
+        metadata: { user_id: userId, tier },
       },
     });
 

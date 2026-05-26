@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
@@ -10,6 +10,8 @@ type WatchedTicker = {
   threshold: number;
   added_at: string;
 };
+
+type Company = { ticker: string; name: string };
 
 function WatchlistContent() {
   const searchParams = useSearchParams();
@@ -21,6 +23,11 @@ function WatchlistContent() {
   const [addThreshold, setAddThreshold] = useState(7);
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<Company[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
+  const searchRef = useRef<HTMLDivElement>(null);
 
   const fetchWatchlist = async () => {
     try {
@@ -40,20 +47,55 @@ function WatchlistContent() {
 
   useEffect(() => { fetchWatchlist(); }, []);
 
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const raw = addTicker.trim();
+  // Fetch company names for all watchlisted tickers
+  useEffect(() => {
+    if (items.length === 0) return;
+    const tickers = items.map((i) => i.ticker).join(",");
+    fetch(`/api/company-names?tickers=${tickers}`)
+      .then((r) => r.ok ? r.json() : {})
+      .then((map) => setCompanyNames(map))
+      .catch(() => {});
+  }, [items]);
+
+  // Autocomplete fetch
+  useEffect(() => {
+    const q = addTicker.trim();
+    if (q.length < 1) { setSuggestions([]); return; }
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/company-search?q=${encodeURIComponent(q)}`);
+        if (res.ok) setSuggestions(await res.json());
+      } catch { /* noop */ }
+    }, 200);
+    return () => clearTimeout(id);
+  }, [addTicker]);
+
+  // Close autocomplete on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const handleAdd = async (tickerVal: string) => {
+    const raw = tickerVal.trim().toUpperCase();
     if (!raw) return;
     setAdding(true);
     setError(null);
+    setShowSuggestions(false);
     try {
       const res = await fetch("/api/watchlist", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ticker: raw.toUpperCase(), threshold: addThreshold }),
+        body: JSON.stringify({ ticker: raw, threshold: addThreshold }),
       });
       if (res.ok) {
         setAddTicker("");
+        setSuggestions([]);
         await fetchWatchlist();
       } else {
         const d = await res.json();
@@ -62,6 +104,24 @@ function WatchlistContent() {
     } finally {
       setAdding(false);
     }
+  };
+
+  const handleAddSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (activeIdx >= 0 && suggestions[activeIdx]) {
+      handleAdd(suggestions[activeIdx].ticker);
+    } else if (suggestions.length > 0) {
+      handleAdd(suggestions[0].ticker);
+    } else {
+      handleAdd(addTicker.split(/\s+/)[0]);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1)); }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
+    if (e.key === "Escape")    { setShowSuggestions(false); setActiveIdx(-1); }
   };
 
   const handleRemove = async (ticker: string) => {
@@ -107,17 +167,37 @@ function WatchlistContent() {
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
 
         {/* Add form (pro only) */}
-        {plan === "pro" ? (
+        {(plan === "pro" || plan === "research") ? (
           <div>
-            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-4">Add ticker</p>
-            <form onSubmit={handleAdd} className="flex gap-2 flex-wrap">
-              <input
-                type="text"
-                value={addTicker}
-                onChange={(e) => setAddTicker(e.target.value)}
-                placeholder="AAPL, MSFT, BA…"
-                className="h-10 px-3 bg-bg-surface border border-bg-border rounded text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors w-44"
-              />
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-4">Add company</p>
+            <form onSubmit={handleAddSubmit} className="flex gap-2 flex-wrap items-start">
+              <div ref={searchRef} className="relative">
+                <input
+                  type="text"
+                  value={addTicker}
+                  onChange={(e) => { setAddTicker(e.target.value); setShowSuggestions(true); setActiveIdx(-1); }}
+                  onFocus={() => setShowSuggestions(true)}
+                  onKeyDown={handleKeyDown}
+                  placeholder="Ticker or company name"
+                  autoComplete="off"
+                  className="h-10 px-3 bg-bg-surface border border-bg-border rounded text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors w-56"
+                />
+                {showSuggestions && suggestions.length > 0 && (
+                  <div className="absolute top-full left-0 right-0 mt-1 bg-bg-surface border border-bg-border rounded-lg overflow-hidden z-20 shadow-xl">
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={s.ticker}
+                        type="button"
+                        onMouseDown={(e) => { e.preventDefault(); handleAdd(s.ticker); }}
+                        className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 transition-colors duration-75 ${i === activeIdx ? "bg-bg-raised" : "hover:bg-bg-raised"}`}
+                      >
+                        <span className="text-sm text-text-secondary truncate">{s.name}</span>
+                        <span className="font-mono text-xs font-semibold text-accent shrink-0">{s.ticker}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
               <select
                 value={addThreshold}
                 onChange={(e) => setAddThreshold(Number(e.target.value))}
@@ -175,12 +255,17 @@ function WatchlistContent() {
             <div className="rounded-xl border border-bg-border divide-y divide-bg-border overflow-hidden">
               {items.map((item) => (
                 <div key={item.ticker} className="px-5 py-4 flex items-center gap-4">
-                  {/* Ticker + link */}
+                  {/* Company name + ticker */}
                   <Link
                     href={`/diff/${item.ticker}`}
-                    className="font-mono text-sm font-bold text-accent hover:text-accent/80 transition-colors w-20 shrink-0"
+                    className="flex items-baseline gap-2 hover:opacity-80 transition-opacity min-w-0 flex-1 max-w-[220px]"
                   >
-                    {item.ticker}
+                    <span className="text-sm text-text-primary truncate">
+                      {companyNames[item.ticker] ?? item.ticker}
+                    </span>
+                    {companyNames[item.ticker] && (
+                      <span className="font-mono text-xs text-text-muted shrink-0">{item.ticker}</span>
+                    )}
                   </Link>
 
                   {/* Threshold selector */}

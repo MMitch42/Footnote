@@ -117,11 +117,15 @@ export default function Home() {
     e.preventDefault();
     const raw = ticker.trim();
     if (!raw) return;
-    // If a suggestion is keyboard-selected use it, otherwise treat input as a raw ticker
+    // If a suggestion is active use it, otherwise use the first word of input as a ticker
     if (activeIdx >= 0 && suggestions[activeIdx]) {
       navigate(suggestions[activeIdx].ticker);
+    } else if (suggestions.length > 0) {
+      // Auto-select the top suggestion if user just pressed Enter
+      navigate(suggestions[0].ticker);
     } else {
-      navigate(raw.toUpperCase());
+      // Strip spaces — only valid tickers (no spaces) should reach Railway
+      navigate(raw.split(/\s+/)[0].toUpperCase());
     }
   };
 

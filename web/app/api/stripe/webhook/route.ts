@@ -25,12 +25,15 @@ export async function POST(req: Request) {
 
       const customerId = session.customer as string;
       const subscriptionId = session.subscription as string;
+      const tier = session.metadata?.tier ?? "pro";
+      const plan = tier === "research" ? "research" : "pro";
+
       await sb.from("subscriptions").upsert(
         {
           user_id: userId,
           stripe_customer_id: customerId,
           stripe_subscription_id: subscriptionId,
-          plan: "pro",
+          plan,
         },
         { onConflict: "user_id" }
       );
@@ -41,9 +44,13 @@ export async function POST(req: Request) {
     case "customer.subscription.deleted": {
       const sub = event.data.object as Stripe.Subscription;
       const customerId = sub.customer as string;
+      const isActive = sub.status === "active" || sub.status === "trialing";
 
-      const plan =
-        sub.status === "active" || sub.status === "trialing" ? "pro" : "free";
+      let plan = "free";
+      if (isActive) {
+        const priceId = sub.items.data[0]?.price.id;
+        plan = priceId === process.env.STRIPE_RESEARCH_PRICE_ID ? "research" : "pro";
+      }
 
       await sb
         .from("subscriptions")

@@ -35,7 +35,7 @@ export async function POST(req: Request) {
     .eq("user_id", userId)
     .single();
 
-  if (sub?.plan !== "pro") {
+  if (sub?.plan !== "pro" && sub?.plan !== "research") {
     return Response.json({ error: "Pro required" }, { status: 403 });
   }
 
