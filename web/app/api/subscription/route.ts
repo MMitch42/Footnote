@@ -8,7 +8,7 @@ export async function GET() {
   const sb = createServerClient();
   const { data, error } = await sb
     .from("subscriptions")
-    .select("plan, current_period_end")
+    .select("plan")
     .eq("user_id", userId)
     .maybeSingle();
 
@@ -20,6 +20,5 @@ export async function GET() {
   return Response.json({
     plan: data?.plan ?? "free",
     userId,
-    current_period_end: data?.current_period_end ?? null,
   });
 }
