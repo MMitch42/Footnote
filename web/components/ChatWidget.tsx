@@ -89,7 +89,7 @@ export function ChatWidget() {
     <>
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-20 right-5 w-[370px] max-h-[520px] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden">
+        <div className="fixed bottom-[152px] right-24 w-[370px] max-h-[520px] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden">
 
           {/* Header */}
           <div className="shrink-0 px-4 py-2.5 border-b border-bg-border flex items-center justify-between bg-bg-raised">
@@ -222,7 +222,7 @@ export function ChatWidget() {
       {/* Toggle button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-5 right-5 w-11 h-11 bg-accent text-bg-base rounded-full shadow-lg hover:bg-accent-bright transition-all duration-150 z-50 flex items-center justify-center font-mono text-base select-none"
+        className="fixed bottom-24 right-24 w-11 h-11 bg-accent text-bg-base rounded-full shadow-lg hover:bg-accent-bright transition-all duration-150 z-50 flex items-center justify-center font-mono text-base select-none"
         title="Footnote AI"
         aria-label="Open Footnote AI assistant"
       >

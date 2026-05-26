@@ -20,32 +20,7 @@ function useInView(threshold = 0.12) {
   return { ref, inView };
 }
 
-const COMPANY_TICKERS: Record<string, string> = {
-  "apple": "AAPL", "microsoft": "MSFT", "nvidia": "NVDA", "amazon": "AMZN",
-  "alphabet": "GOOGL", "google": "GOOGL", "meta": "META", "facebook": "META",
-  "instagram": "META", "whatsapp": "META", "tesla": "TSLA", "broadcom": "AVGO",
-  "salesforce": "CRM", "oracle": "ORCL", "intel": "INTC", "amd": "AMD",
-  "qualcomm": "QCOM", "netflix": "NFLX", "adobe": "ADBE", "uber": "UBER",
-  "airbnb": "ABNB", "palantir": "PLTR", "snowflake": "SNOW", "shopify": "SHOP",
-  "spotify": "SPOT", "lyft": "LYFT", "coinbase": "COIN", "robinhood": "HOOD",
-  "jpmorgan": "JPM", "jp morgan": "JPM", "chase": "JPM",
-  "bank of america": "BAC", "wells fargo": "WFC", "goldman sachs": "GS",
-  "goldman": "GS", "morgan stanley": "MS", "citigroup": "C", "citi": "C",
-  "visa": "V", "mastercard": "MA", "american express": "AXP", "amex": "AXP",
-  "blackrock": "BLK", "berkshire": "BRK.B", "berkshire hathaway": "BRK.B",
-  "boeing": "BA", "lockheed martin": "LMT", "lockheed": "LMT",
-  "raytheon": "RTX", "general electric": "GE", "caterpillar": "CAT",
-  "3m": "MMM", "ups": "UPS", "fedex": "FDX", "deere": "DE",
-  "johnson & johnson": "JNJ", "johnson and johnson": "JNJ", "j&j": "JNJ",
-  "pfizer": "PFE", "moderna": "MRNA", "unitedhealth": "UNH", "abbott": "ABT",
-  "merck": "MRK", "eli lilly": "LLY", "lilly": "LLY", "cvs": "CVS",
-  "walmart": "WMT", "target": "TGT", "costco": "COST", "home depot": "HD",
-  "nike": "NKE", "coca-cola": "KO", "coke": "KO", "pepsi": "PEP",
-  "pepsico": "PEP", "mcdonald's": "MCD", "mcdonalds": "MCD",
-  "starbucks": "SBUX", "disney": "DIS", "comcast": "CMCSA",
-  "exxon": "XOM", "exxonmobil": "XOM", "chevron": "CVX",
-  "conocophillips": "COP", "shell": "SHEL",
-};
+type Company = { ticker: string; name: string };
 
 const DEMO = {
   dateNew: "Oct 2025", dateOld: "Nov 2024",
@@ -103,12 +78,58 @@ export default function Home() {
   const { ref: howRef, inView: howInView } = useInView();
   const { ref: waitlistRef, inView: waitlistInView } = useInView();
 
+  // Autocomplete
+  const [suggestions, setSuggestions] = useState<Company[]>([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeIdx, setActiveIdx] = useState(-1);
+  const searchRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const q = ticker.trim();
+    if (q.length < 1) { setSuggestions([]); return; }
+    const id = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/company-search?q=${encodeURIComponent(q)}`);
+        if (res.ok) setSuggestions(await res.json());
+      } catch { /* noop */ }
+    }, 200);
+    return () => clearTimeout(id);
+  }, [ticker]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (searchRef.current && !searchRef.current.contains(e.target as Node)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const navigate = (resolved: string) => {
+    setShowSuggestions(false);
+    setSuggestions([]);
+    router.push(`/diff/${resolved}`);
+  };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const raw = ticker.trim();
     if (!raw) return;
-    const resolved = COMPANY_TICKERS[raw.toLowerCase()] ?? raw.toUpperCase();
-    router.push(`/diff/${resolved}`);
+    // If a suggestion is keyboard-selected use it, otherwise treat input as a raw ticker
+    if (activeIdx >= 0 && suggestions[activeIdx]) {
+      navigate(suggestions[activeIdx].ticker);
+    } else {
+      navigate(raw.toUpperCase());
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+    if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1)); }
+    if (e.key === "ArrowUp")   { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
+    if (e.key === "Escape")    { setShowSuggestions(false); setActiveIdx(-1); }
   };
 
   const handleWaitlist = async (e: React.FormEvent) => {
@@ -179,23 +200,47 @@ export default function Home() {
             semantic materiality. Know what companies quietly rewrote before the market reacts.
           </p>
 
-          <form onSubmit={handleSearch} className="flex max-w-sm">
-            <input
-              type="text"
-              value={ticker}
-              onChange={(e) => setTicker(e.target.value)}
-              placeholder="Ticker or company name"
-              className="flex-1 h-10 px-3 bg-bg-surface border border-bg-border border-r-0 rounded-l text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors duration-150"
-            />
-            <button
-              type="submit"
-              className="px-5 h-10 bg-text-primary text-bg-base text-sm font-semibold rounded-r hover:bg-text-primary/90 transition-colors duration-150 whitespace-nowrap"
-            >
-              Analyze →
-            </button>
-          </form>
+          <div ref={searchRef} className="relative max-w-sm">
+            <form onSubmit={handleSearch} className="flex">
+              <input
+                type="text"
+                value={ticker}
+                onChange={(e) => { setTicker(e.target.value); setShowSuggestions(true); setActiveIdx(-1); }}
+                onFocus={() => setShowSuggestions(true)}
+                onKeyDown={handleKeyDown}
+                placeholder="Ticker or company name"
+                autoComplete="off"
+                className="flex-1 h-10 px-3 bg-bg-surface border border-bg-border border-r-0 rounded-l text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors duration-150"
+              />
+              <button
+                type="submit"
+                className="px-5 h-10 bg-text-primary text-bg-base text-sm font-semibold rounded-r hover:bg-text-primary/90 transition-colors duration-150 whitespace-nowrap"
+              >
+                Analyze →
+              </button>
+            </form>
+
+            {/* Autocomplete dropdown */}
+            {showSuggestions && suggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-bg-surface border border-bg-border rounded-lg overflow-hidden z-20 shadow-xl">
+                {suggestions.map((s, i) => (
+                  <button
+                    key={s.ticker}
+                    type="button"
+                    onMouseDown={(e) => { e.preventDefault(); navigate(s.ticker); }}
+                    className={`w-full text-left px-3 py-2.5 flex items-center justify-between gap-3 transition-colors duration-75 ${
+                      i === activeIdx ? "bg-bg-raised" : "hover:bg-bg-raised"
+                    }`}
+                  >
+                    <span className="text-sm text-text-secondary truncate">{s.name}</span>
+                    <span className="font-mono text-xs font-semibold text-accent shrink-0">{s.ticker}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           <p className="text-xs text-text-muted mt-2">
-            Try: Boeing, Apple, NVDA, JPMorgan
+            Any public company or ticker — 10,000+ SEC filers
           </p>
         </div>
       </div>
