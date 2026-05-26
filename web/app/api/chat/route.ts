@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
   try {
     const { text } = await generateText({
-      model: google("gemini-2.0-flash"),
+      model: google("gemini-2.5-flash"),
       system: SYSTEM_PROMPT + contextBlock,
       messages: messages.map((m) => ({
         role: m.role,
@@ -69,8 +69,8 @@ export async function POST(req: Request) {
 
     return Response.json({ content: text });
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Unknown error";
+    const message = err instanceof Error ? err.message : String(err);
     console.error("Gemini chat error:", message);
-    return Response.json({ error: "Failed to get response" }, { status: 500 });
+    return Response.json({ error: "Failed to get response. Please try again." }, { status: 500 });
   }
 }

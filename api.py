@@ -57,3 +57,75 @@ def _run_historical(job_id: str, ticker: str, form: str, n: int):
         db.update_job(job_id, "complete", result)
     except Exception as e:
         db.update_job(job_id, "error", {"error": str(e)})
+
+
+@app.get("/timeline/{ticker}")
+def get_timeline(ticker: str, form: str = "10-K"):
+    """
+    Return novelty-score summary for all cached consecutive diffs.
+    Used to render the historical timeline chart on the frontend.
+    """
+    rows = db.list_diffs_raw(ticker.upper(), form)
+
+    # Group rows by (date_new, date_old) pair and aggregate scores
+    pairs: dict = {}
+    for row in rows:
+        key = (row["filing_date_new"], row["filing_date_old"])
+        if key not in pairs:
+            pairs[key] = {
+                "date_new": row["filing_date_new"],
+                "date_old": row["filing_date_old"],
+                "scores": [],
+                "n_changes": 0,
+                "change_ratio": 0.0,
+            }
+        passages = row.get("changed_passages") or []
+        scores = [p["score"] for p in passages if p.get("score") is not None]
+        pairs[key]["scores"].extend(scores)
+        pairs[key]["n_changes"] += len(passages)
+        pairs[key]["change_ratio"] = max(
+            pairs[key]["change_ratio"], row.get("change_ratio") or 0.0
+        )
+
+    result = []
+    for pair in pairs.values():
+        scores = pair["scores"]
+        result.append({
+            "date_new": pair["date_new"],
+            "date_old": pair["date_old"],
+            "max_score": max(scores) if scores else 0,
+            "avg_score": round(sum(scores) / len(scores), 1) if scores else 0,
+            "n_changes": pair["n_changes"],
+            "change_ratio": round(pair["change_ratio"], 3),
+        })
+
+    # Oldest first for chart display
+    result.sort(key=lambda x: x["date_new"])
+    return result
+
+
+@app.get("/diff/{ticker}")
+def get_specific_diff(ticker: str, date_new: str, date_old: str, form: str = "10-K"):
+    """
+    Fetch a specific cached diff pair by exact dates.
+    Returns 404-style error if not in cache — trigger /historical first.
+    """
+    sections = {}
+    for section in ["item_1a", "item_7", "item_3"]:
+        cached = db.get_diff(ticker.upper(), form, date_new, date_old, section)
+        if cached:
+            sections[section] = cached
+
+    if not sections:
+        return {
+            "error": f"No cached diff found for {ticker} ({date_new} vs {date_old}). "
+                     "Run historical backfill first."
+        }
+
+    return {
+        "ticker": ticker.upper(),
+        "filing_type": form,
+        "date_new": date_new,
+        "date_old": date_old,
+        "sections": sections,
+    }

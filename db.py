@@ -104,3 +104,30 @@ def get_filing(ticker: str, filing_type: str, filing_date: str):
         .execute()
     )
     return result.data[0] if result.data else None
+
+
+def list_diffs_raw(ticker: str, filing_type: str) -> list:
+    """Return all cached diff rows for a ticker — used to build the timeline."""
+    client = get_client()
+    result = (
+        client.table("diffs")
+        .select("filing_date_new,filing_date_old,section,changed_passages,change_ratio")
+        .eq("ticker", ticker.upper())
+        .eq("filing_type", filing_type)
+        .execute()
+    )
+    return result.data if result.data else []
+
+
+def list_filings_dates(ticker: str, filing_type: str) -> list:
+    """Return all cached filing dates for a ticker, newest first."""
+    client = get_client()
+    result = (
+        client.table("filings")
+        .select("filing_date,accession_number")
+        .eq("ticker", ticker.upper())
+        .eq("filing_type", filing_type)
+        .order("filing_date", desc=True)
+        .execute()
+    )
+    return result.data if result.data else []

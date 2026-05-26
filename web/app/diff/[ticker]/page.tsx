@@ -2,7 +2,7 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
 
 
@@ -323,6 +323,11 @@ function PassageDetail({ passage, onBack }: { passage: Passage; onBack: () => vo
 export default function DiffPage({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = use(params);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const dateNew = searchParams.get("date_new");
+  const dateOld = searchParams.get("date_old");
+  const isHistorical = !!(dateNew && dateOld);
+
   const [data, setData] = useState<DiffResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -334,11 +339,14 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
   const [plan, setPlan] = useState<"free" | "pro" | "research">("free");
 
   useEffect(() => {
-    fetch(`${API_URL}/alert/${ticker}`)
+    const url = isHistorical
+      ? `${API_URL}/diff/${ticker}?date_new=${dateNew}&date_old=${dateOld}`
+      : `${API_URL}/alert/${ticker}`;
+    fetch(url)
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false); })
       .catch((e) => { setError(e.message); setLoading(false); });
-  }, [ticker]);
+  }, [ticker, dateNew, dateOld, isHistorical]);
 
   // Check watchlist status + subscription
   useEffect(() => {
@@ -436,6 +444,14 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
               >
                 {watchLoading ? "…" : watching ? "★ Watching" : "☆ Watch"}
               </button>
+              {plan === "research" && (
+                <Link
+                  href={`/history/${ticker}`}
+                  className="text-xs text-text-secondary hover:text-text-primary transition-colors duration-150"
+                >
+                  History
+                </Link>
+              )}
               <Link href="/watchlist" className="text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">
                 Watchlist
               </Link>
@@ -493,6 +509,14 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
           {/* Filing header */}
           <div className="shrink-0 px-6 py-3 border-b border-bg-border bg-bg-surface flex items-center justify-between">
             <div className="flex items-center gap-3">
+              {isHistorical && (
+                <Link
+                  href={`/history/${ticker}`}
+                  className="text-xs text-text-muted hover:text-accent transition-colors duration-150 mr-1"
+                >
+                  ← History
+                </Link>
+              )}
               <span className="font-mono text-sm font-bold text-text-primary uppercase tracking-wide">{data.ticker}</span>
               <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase tracking-wider">
                 {data.filing_type}
