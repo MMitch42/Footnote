@@ -2,7 +2,9 @@
 
 import { use, useEffect, useRef, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
+
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -320,6 +322,7 @@ function PassageDetail({ passage, onBack }: { passage: Passage; onBack: () => vo
 /* ── Page ───────────────────────────────────────────────────── */
 export default function DiffPage({ params }: { params: Promise<{ ticker: string }> }) {
   const { ticker } = use(params);
+  const router = useRouter();
   const [data, setData] = useState<DiffResult | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -328,6 +331,7 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
   const selectedRowRef = useRef<HTMLButtonElement>(null);
   const [watching, setWatching] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
+  const [plan, setPlan] = useState<"free" | "pro">("free");
 
   useEffect(() => {
     fetch(`${API_URL}/alert/${ticker}`)
@@ -336,17 +340,22 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
       .catch((e) => { setError(e.message); setLoading(false); });
   }, [ticker]);
 
-  // Check if this ticker is already watched
+  // Check watchlist status + subscription
   useEffect(() => {
-    fetch("/api/watchlist")
-      .then((r) => r.ok ? r.json() : [])
-      .then((list: { ticker: string }[]) => {
-        setWatching(list.some((i) => i.ticker === ticker.toUpperCase()));
-      })
-      .catch(() => {});
+    Promise.all([
+      fetch("/api/watchlist").then((r) => r.ok ? r.json() : []),
+      fetch("/api/subscription").then((r) => r.ok ? r.json() : { plan: "free" }),
+    ]).then(([list, sub]) => {
+      setWatching(list.some((i: { ticker: string }) => i.ticker === ticker.toUpperCase()));
+      setPlan(sub.plan ?? "free");
+    }).catch(() => {});
   }, [ticker]);
 
   const toggleWatch = async () => {
+    if (plan === "free") {
+      router.push("/upgrade");
+      return;
+    }
     setWatchLoading(true);
     try {
       if (watching) {
@@ -469,7 +478,7 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
                 <span className="text-text-secondary">{data.date_new}</span>
               </div>
             </div>
-            <span className="text-xs text-text-muted">
+            <span className="text-xs text-text-secondary">
               {allPassages.length} changes · {highPassages.length} high-novelty
             </span>
           </div>

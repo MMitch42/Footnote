@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 
 type WatchedTicker = {
@@ -17,6 +18,8 @@ const THRESHOLD_LABELS: Record<number, string> = {
 };
 
 export default function WatchlistPage() {
+  const searchParams = useSearchParams();
+  const justUpgraded = searchParams.get("upgraded") === "true";
   const [items, setItems] = useState<WatchedTicker[]>([]);
   const [loading, setLoading] = useState(true);
   const [plan, setPlan] = useState<"free" | "pro">("free");
@@ -96,6 +99,16 @@ export default function WatchlistPage() {
           <UserButton appearance={{ variables: { colorPrimary: "#f59e0b" }, elements: { avatarBox: "w-8 h-8" } }} />
         </div>
       </nav>
+
+      {/* Upgrade success banner */}
+      {justUpgraded && (
+        <div className="border-b border-diff-add-border bg-diff-add/20 px-6 py-3 flex items-center gap-3">
+          <div className="w-1.5 h-1.5 rounded-full bg-diff-add-text shrink-0" />
+          <p className="text-sm text-diff-add-text">
+            You&apos;re on Pro. Add your first ticker below and we&apos;ll alert you when something changes.
+          </p>
+        </div>
+      )}
 
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
 
