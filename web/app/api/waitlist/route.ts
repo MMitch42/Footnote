@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
     //   html: `
     //     <p>Hi,</p>
     //     <p>You're on the list. We'll reach out when early access opens.</p>
-    //     <p>— Footnote</p>
+    //     <p>Footnote</p>
     //   `,
     // });
 

@@ -33,14 +33,14 @@ const COMPANY_TICKERS: Record<string, string> = {
 
 const DEMO = {
   dateNew: "Jan 2026", dateOld: "Feb 2025",
-  explanation: "Boeing replaced generic program-risk boilerplate with specific disclosure of 777X and 737-7/737-10 certification delays, explicitly acknowledging ongoing FAA process uncertainty — a material escalation for investors.",
+  explanation: "Boeing replaced generic program-risk language with specific disclosures naming the 777X and 737-7/737-10 programs, and explicitly stated the FAA certification process is ongoing and has experienced significant delays.",
   old: "The commercial aircraft business is extremely complex, involving extensive coordination and integration with suppliers, highly-skilled labor performed by thousands of employees of ours and other partners, and stringent and evolving regulatory requirements and performance and reliability standards.",
   new: "The introduction of new aircraft programs and/or derivatives, such as the 777X, 737-7 and 737-10, takes years and involves significant risks associated with meeting development, testing, certification, and production schedules. We follow the lead of the FAA as we work through the certification process, and we have experienced, and may continue to experience, significant delays.",
 };
 
 const STEPS = [
   { n: "01", title: "Enter any ticker or company.", body: "Footnote fetches the last 10 years of 10-K and 10-Q filings from SEC EDGAR." },
-  { n: "02", title: "We diff every consecutive pair.", body: "Each changed passage is scored 1–10 for semantic novelty — not just text similarity." },
+  { n: "02", title: "We diff every consecutive pair.", body: "Each changed passage is scored 1-10 for semantic novelty, not just text similarity." },
   { n: "03", title: "Get alerted when something changes.", body: "Set a novelty threshold. We email you the moment a company quietly rewrites a risk factor or litigation disclosure." },
 ];
 
@@ -87,10 +87,10 @@ export default function Home() {
                 Sign in
               </a>
               <a
-                href="#waitlist"
+                href="/sign-up"
                 className="text-sm font-medium px-4 h-8 flex items-center bg-text-primary text-bg-base rounded hover:bg-text-primary/90 transition-colors duration-150"
               >
-                Join waitlist →
+                Sign up →
               </a>
             </Show>
             <Show when="signed-in">
@@ -118,9 +118,6 @@ export default function Home() {
           style={{ background: "radial-gradient(ellipse 90% 60% at 50% -5%, rgba(245,158,11,0.09) 0%, transparent 65%)" }}
         />
         <div className="relative z-10 max-w-5xl mx-auto px-6 pt-20 pb-16">
-          <p className="font-mono text-[11px] text-text-muted uppercase tracking-widest mb-6">
-            Cohen, Malloy &amp; Nguyen · Journal of Finance, 2020
-          </p>
           <h1 className="font-mono text-4xl font-bold text-text-primary leading-tight mb-5 max-w-xl">
             The signal<br />in the filings.
           </h1>
@@ -194,7 +191,7 @@ export default function Home() {
             </div>
             {/* Analysis */}
             <div className="px-4 py-3 bg-bg-surface flex items-start gap-3">
-              <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider shrink-0 mt-0.5">Analysis</span>
+              <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider shrink-0 mt-0.5">AI Analysis</span>
               <p className="text-sm text-text-secondary leading-relaxed">{DEMO.explanation}</p>
             </div>
           </div>
@@ -213,14 +210,23 @@ export default function Home() {
           </div>
           <div className="pt-10 sm:pt-0 border-t border-bg-border sm:border-t-0 sm:border-l sm:pl-10">
             <p className="text-sm text-text-secondary leading-relaxed">
-              Cohen, Malloy &amp; Nguyen (Journal of Finance, 2020) — companies that change their 10-K
+              Cohen, Malloy &amp; Nguyen (Journal of Finance, 2020): companies that change their 10-K
               language underperform by 22% annually. Institutional research platforms charge up to
               $15,000/year for this signal.
             </p>
-            <p className="text-base font-semibold text-accent mt-5">
-              Footnote: $9/month, early access.{" "}
-              <span className="text-text-muted font-normal line-through text-sm">$29</span>
-            </p>
+            <div className="flex items-center gap-3 mt-5 flex-wrap">
+              <div className="flex items-baseline gap-2">
+                <span className="text-text-muted font-normal line-through text-sm">$29</span>
+                <span className="text-base font-semibold text-accent">$9/month</span>
+                <span className="text-sm text-text-muted font-normal">early access</span>
+              </div>
+              <a
+                href="/upgrade"
+                className="text-sm font-medium px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors"
+              >
+                Subscribe →
+              </a>
+            </div>
           </div>
         </div>
 
@@ -243,10 +249,10 @@ export default function Home() {
         {/* Waitlist */}
         <div id="waitlist" className="border-t border-bg-border py-14 mb-6">
           <div className="max-w-lg">
-            <p className="text-lg font-semibold text-text-primary mb-1">Get early access.</p>
-            <p className="text-sm text-text-muted mb-6">Early access pricing locked in. No credit card required.</p>
+            <p className="text-lg font-semibold text-text-primary mb-1">Not ready to subscribe?</p>
+            <p className="text-sm text-text-muted mb-6">Leave your email and we&apos;ll let you know when new features ship. No credit card, no spam.</p>
             {submitted ? (
-              <p className="text-sm text-diff-add-text">You&apos;re on the list. We&apos;ll be in touch.</p>
+              <p className="text-sm text-diff-add-text">Got it. We&apos;ll be in touch.</p>
             ) : (
               <form onSubmit={handleWaitlist} className="flex max-w-sm">
                 <input

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Terms of Service — Footnote" };
+export const metadata = { title: "Terms of Service | Footnote" };
 
 export default function TermsPage() {
   return (
@@ -42,7 +42,7 @@ export default function TermsPage() {
             <h2 className="font-semibold text-text-primary mb-2">3. Not Financial Advice</h2>
             <p>
               Nothing on Footnote constitutes financial, investment, legal, or tax advice. The Service
-              surfaces changes in public SEC disclosures — it does not recommend buying or selling any
+              surfaces changes in public SEC disclosures. It does not recommend buying or selling any
               security. You are solely responsible for any investment decisions you make. Past signal
               performance documented in academic research does not guarantee future results.
             </p>
@@ -57,7 +57,7 @@ export default function TermsPage() {
             <p className="mb-3">
               <strong className="text-text-primary">Cancellation:</strong> You may cancel at any time
               through your account settings. Cancellation takes effect at the end of your current
-              billing period — you retain access to Pro features until that date.
+              billing period. You retain access to Pro features until that date.
             </p>
             <p>
               <strong className="text-text-primary">Refunds:</strong> All payments are non-refundable.
@@ -79,9 +79,10 @@ export default function TermsPage() {
           <section>
             <h2 className="font-semibold text-text-primary mb-2">6. Intellectual Property</h2>
             <p>
-              The Service, including its interface, scoring methodology, and original content, is owned
-              by Mitchell Magid. SEC filings are public domain documents. You may not reproduce or
-              redistribute the Service&apos;s original output without permission.
+              The Footnote application code and user interface are owned by Mitchell Magid.
+              SEC filings retrieved through the Service are public domain documents published by
+              the U.S. Securities and Exchange Commission. You may not copy or distribute the
+              application code or interface design without permission.
             </p>
           </section>
 

@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export const metadata = { title: "Privacy Policy — Footnote" };
+export const metadata = { title: "Privacy Policy | Footnote" };
 
 export default function PrivacyPage() {
   return (
@@ -41,8 +41,8 @@ export default function PrivacyPage() {
               </li>
               <li>
                 <strong className="text-text-primary">Payment information:</strong> Billing is handled
-                entirely by Stripe. We store only your Stripe customer ID and subscription status —
-                we never see or store your card details.
+                entirely by Stripe. We store only your Stripe customer ID and subscription status.
+                We never see or store your card details.
               </li>
               <li>
                 <strong className="text-text-primary">Usage data:</strong> Standard server logs
@@ -73,24 +73,24 @@ export default function PrivacyPage() {
             </p>
             <ul className="list-disc pl-5 space-y-2">
               <li>
-                <strong className="text-text-primary">Clerk</strong> — authentication and user
+                <strong className="text-text-primary">Clerk</strong>: authentication and user
                 management.{" "}
                 <a href="https://clerk.com/privacy" className="text-accent hover:text-accent-bright transition-colors" target="_blank" rel="noopener noreferrer">Privacy policy →</a>
               </li>
               <li>
-                <strong className="text-text-primary">Stripe</strong> — payment processing.{" "}
+                <strong className="text-text-primary">Stripe</strong>: payment processing.{" "}
                 <a href="https://stripe.com/privacy" className="text-accent hover:text-accent-bright transition-colors" target="_blank" rel="noopener noreferrer">Privacy policy →</a>
               </li>
               <li>
-                <strong className="text-text-primary">Resend</strong> — transactional email delivery.{" "}
+                <strong className="text-text-primary">Resend</strong>: transactional email delivery.{" "}
                 <a href="https://resend.com/privacy" className="text-accent hover:text-accent-bright transition-colors" target="_blank" rel="noopener noreferrer">Privacy policy →</a>
               </li>
               <li>
-                <strong className="text-text-primary">Supabase</strong> — database storage.{" "}
+                <strong className="text-text-primary">Supabase</strong>: database storage.{" "}
                 <a href="https://supabase.com/privacy" className="text-accent hover:text-accent-bright transition-colors" target="_blank" rel="noopener noreferrer">Privacy policy →</a>
               </li>
               <li>
-                <strong className="text-text-primary">Vercel</strong> — hosting and infrastructure.{" "}
+                <strong className="text-text-primary">Vercel</strong>: hosting and infrastructure.{" "}
                 <a href="https://vercel.com/legal/privacy-policy" className="text-accent hover:text-accent-bright transition-colors" target="_blank" rel="noopener noreferrer">Privacy policy →</a>
               </li>
             </ul>

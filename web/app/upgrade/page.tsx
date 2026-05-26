@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 const FEATURES = [
-  "Watchlist — track up to 50 tickers",
+  "Watchlist: track up to 50 tickers",
   "Daily email alerts when language changes",
   "Novelty threshold control (Notable / High / Critical)",
   "Full historical diff explorer",
@@ -39,10 +39,16 @@ export default function UpgradePage() {
     <div className="min-h-screen bg-bg-base flex flex-col">
       {/* Nav */}
       <nav className="border-b border-bg-border">
-        <div className="max-w-3xl mx-auto px-6 h-12 flex items-center">
+        <div className="max-w-3xl mx-auto px-6 h-12 flex items-center justify-between">
           <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors">
             FOOTNOTE
           </Link>
+          <button
+            onClick={() => router.back()}
+            className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+          >
+            ← Back
+          </button>
         </div>
       </nav>
 
@@ -58,14 +64,14 @@ export default function UpgradePage() {
           {/* Header */}
           <div className="mb-10">
             <div className="flex items-baseline gap-3 mb-3">
+              <span className="text-sm text-text-muted line-through">$29</span>
               <h1 className="font-mono text-4xl font-bold text-text-primary">
                 $9<span className="text-xl text-text-muted font-normal">/mo</span>
               </h1>
-              <span className="text-sm text-text-muted line-through">$29</span>
             </div>
             <p className="text-sm text-text-secondary leading-relaxed">
               Locked in for early subscribers. Institutional tools charge $15,000/year
-              for this signal — this price won&apos;t last.
+              for this signal. This price won&apos;t last.
             </p>
           </div>
 
@@ -85,7 +91,7 @@ export default function UpgradePage() {
             disabled={loading}
             className="w-full h-12 bg-accent text-bg-base font-semibold text-sm rounded-lg hover:bg-accent-bright transition-colors disabled:opacity-60 font-mono tracking-wide"
           >
-            {loading ? "Redirecting to checkout…" : "Get early access — $9/month →"}
+            {loading ? "Redirecting to checkout…" : "Get early access for $9/month →"}
           </button>
           {error && <p className="text-xs text-diff-rem-text mt-3 text-center">{error}</p>}
 

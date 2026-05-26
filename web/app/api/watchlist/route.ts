@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createServerClient } from "@/lib/supabase";
 
-// GET /api/watchlist — list the current user's watched tickers
+// GET /api/watchlist - list the current user's watched tickers
 export async function GET() {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -17,7 +17,7 @@ export async function GET() {
   return Response.json(data);
 }
 
-// POST /api/watchlist — add a ticker { ticker, threshold }
+// POST /api/watchlist - add a ticker { ticker, threshold }
 export async function POST(req: Request) {
   const { userId } = await auth();
   if (!userId) return Response.json({ error: "Unauthorized" }, { status: 401 });

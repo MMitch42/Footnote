@@ -11,12 +11,6 @@ type WatchedTicker = {
   added_at: string;
 };
 
-const THRESHOLD_LABELS: Record<number, string> = {
-  4: "Notable (4+)",
-  7: "High (7+)",
-  9: "Critical (9+)",
-};
-
 function WatchlistContent() {
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("upgraded") === "true";
@@ -112,7 +106,7 @@ function WatchlistContent() {
 
       <div className="max-w-3xl mx-auto px-6 py-10 space-y-10">
 
-        {/* Add form — pro only */}
+        {/* Add form (pro only) */}
         {plan === "pro" ? (
           <div>
             <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-4">Add ticker</p>
@@ -146,7 +140,7 @@ function WatchlistContent() {
         ) : !loading ? (
           <div className="rounded-xl border border-accent/30 bg-accent/5 px-6 py-6 flex items-start justify-between gap-6">
             <div>
-              <p className="text-sm font-semibold text-text-primary mb-1">Footnote Pro — $9/month <span className="text-text-muted font-normal text-xs">early access</span></p>
+              <p className="text-sm font-semibold text-text-primary mb-1">Footnote Pro: $9/month <span className="text-text-muted font-normal text-xs">early access</span></p>
               <p className="text-sm text-text-secondary leading-relaxed max-w-sm">
                 Add tickers and get emailed the moment a company quietly rewrites a risk factor or litigation disclosure.
               </p>

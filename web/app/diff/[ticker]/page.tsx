@@ -38,9 +38,9 @@ const SECTION_SHORT: Record<string, string> = {
   item_1a: "1A", item_7: "7", item_3: "3",
 };
 const SECTION_FULL: Record<string, string> = {
-  item_1a: "Item 1A — Risk Factors",
-  item_7:  "Item 7 — MD&A",
-  item_3:  "Item 3 — Legal Proceedings",
+  item_1a: "Item 1A: Risk Factors",
+  item_7:  "Item 7: MD&A",
+  item_3:  "Item 3: Legal Proceedings",
 };
 
 function scoreCfg(score: number | null) {
@@ -53,7 +53,7 @@ function scoreCfg(score: number | null) {
 
 function ScoreBadge({ score }: { score: number | null }) {
   const cfg = scoreCfg(score);
-  if (!cfg || !score) return <span className="font-mono text-xs text-text-muted/30">—</span>;
+  if (!cfg || !score) return <span className="font-mono text-xs text-text-muted/30">?</span>;
   return (
     <div className="flex items-center gap-1.5 shrink-0">
       <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
@@ -66,7 +66,7 @@ function shortTopic(explanation: string | null): string {
   if (!explanation) return "Language change detected";
   const words = explanation.split(" ");
   if (words.length <= 5) return explanation.replace(/\.$/, "");
-  for (const sep of [" — ", ", ", " which ", " that "]) {
+  for (const sep of [": ", ", ", " which ", " that "]) {
     const idx = explanation.indexOf(sep);
     if (idx > 0 && idx < 52) return explanation.slice(0, idx);
   }
@@ -82,12 +82,12 @@ function generateInterpretation(
   const highRea = high.filter((p) => p.direction === "reassuring").length;
 
   if (high.length === 0)
-    return `${ticker}'s latest ${filingType} shows ${passages.length} language changes, none exceeding the high-novelty threshold. Changes appear largely administrative or cosmetic.`;
+    return `${ticker}'s ${filingType} contains ${passages.length} detected language change${passages.length !== 1 ? "s" : ""}. None scored above the high-novelty threshold (7+). The changes may be routine updates or minor rewording.`;
   if (highEsc > highRea * 2)
-    return `${ticker}'s filing contains ${high.length} high-novelty changes, ${highEsc} of which are escalating. The language shift is predominantly risk-amplifying — new specific disclosures, removed reassurances, or acknowledged uncertainty. Warrants close reading.`;
+    return `${ticker}'s ${filingType} contains ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highEsc} scored as escalating and ${highRea} as reassuring. More language shifted toward added risk disclosure than away from it. Read the individual findings below to judge significance.`;
   if (highRea > highEsc * 2)
-    return `${ticker}'s filing contains ${high.length} high-novelty changes, ${highRea} of which are reassuring. The language shift suggests reduced risk acknowledgment or improved conditions versus the prior period.`;
-  return `${ticker}'s filing contains ${high.length} high-novelty changes split between ${highEsc} escalating and ${highRea} reassuring (${esc} vs ${rea} overall). The mixed signal warrants reading the top findings individually.`;
+    return `${ticker}'s ${filingType} contains ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highRea} scored as reassuring and ${highEsc} as escalating. More language shifted away from risk disclosure than toward it. Read the individual findings below to judge significance.`;
+  return `${ticker}'s ${filingType} contains ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highEsc} escalating and ${highRea} reassuring (${esc} vs ${rea} across all changes). The direction is mixed. Read the individual findings below.`;
 }
 
 /* ── Briefing panel ─────────────────────────────────────────── */
@@ -116,7 +116,7 @@ function BriefingPanel({
       {/* Header */}
       <div>
         <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1">
-          Analysis briefing
+          AI Analysis
         </p>
         <p className="font-mono text-xs text-text-muted">
           {data.ticker} · {data.filing_type} · {data.date_old} → {data.date_new}
@@ -440,6 +440,22 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
                 Watchlist
               </Link>
               <UserButton appearance={{ variables: { colorPrimary: "#f59e0b" }, elements: { avatarBox: "w-7 h-7" } }} />
+            </div>
+          </Show>
+          <Show when="signed-out">
+            <div className="flex items-center gap-3">
+              <a
+                href="/sign-in"
+                className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150"
+              >
+                Sign in
+              </a>
+              <a
+                href="/sign-up"
+                className="text-xs font-medium px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150"
+              >
+                Get alerts →
+              </a>
             </div>
           </Show>
         </div>

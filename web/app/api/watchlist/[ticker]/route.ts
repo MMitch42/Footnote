@@ -1,7 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 import { createServerClient } from "@/lib/supabase";
 
-// DELETE /api/watchlist/:ticker — remove a ticker from the watchlist
+// DELETE /api/watchlist/:ticker - remove a ticker from the watchlist
 export async function DELETE(
   _req: Request,
   { params }: { params: Promise<{ ticker: string }> }
@@ -21,7 +21,7 @@ export async function DELETE(
   return new Response(null, { status: 204 });
 }
 
-// PATCH /api/watchlist/:ticker — update threshold
+// PATCH /api/watchlist/:ticker - update threshold
 export async function PATCH(
   req: Request,
   { params }: { params: Promise<{ ticker: string }> }

@@ -133,7 +133,7 @@ const SCORE_COLOR: Record<string, string> = {
 };
 
 function scoreLabel(score: number | null) {
-  if (!score) return { label: "—", color: "#6b7280" };
+  if (!score) return { label: "unscored", color: "#6b7280" };
   if (score >= 9) return { label: `${score}/10 Critical`, color: SCORE_COLOR.critical };
   if (score >= 7) return { label: `${score}/10 High`,     color: SCORE_COLOR.high };
   if (score >= 4) return { label: `${score}/10 Notable`,  color: SCORE_COLOR.notable };

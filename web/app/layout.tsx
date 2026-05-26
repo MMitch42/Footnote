@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Footnote — SEC Filing Intelligence",
+  title: "Footnote | SEC Filing Intelligence",
   description:
     "Know when a company quietly changes what it tells investors. Footnote diffs consecutive SEC filings and scores every language change for semantic materiality.",
 };
