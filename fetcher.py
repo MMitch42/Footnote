@@ -13,7 +13,13 @@ def get_filings(ticker: str, form: str = "10-K", n: int = 2):
     """Return the n most recent filings of the given type for a ticker."""
     company = Company(ticker)
     filings = company.get_filings(form=form)
-    return filings.latest(n)
+    result = filings.latest(n)
+    # edgartools returns a single EntityFiling (not a list) when only one result exists
+    if result is None:
+        return []
+    if not isinstance(result, list):
+        return [result]
+    return result
 
 
 def extract_sections(filing) -> dict:
