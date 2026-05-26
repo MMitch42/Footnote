@@ -18,7 +18,7 @@ export async function POST() {
     const user = await clerk.users.getUser(userId);
     const email = user.emailAddresses[0]?.emailAddress;
 
-    const appUrl = process.env.APP_URL ?? "https://footnote-web.vercel.app";
+    const appUrl = process.env.APP_URL ?? "https://getfootnote.app";
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",

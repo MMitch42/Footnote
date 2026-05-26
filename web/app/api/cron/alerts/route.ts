@@ -98,7 +98,7 @@ export async function GET(req: Request) {
       if (!email) continue;
 
       // Send alert
-      const appUrl = process.env.APP_URL ?? "https://footnote-web.vercel.app";
+      const appUrl = process.env.APP_URL ?? "https://getfootnote.app";
       await resend.emails.send({
         // TODO: replace sender once your domain is verified in Resend
         from: "Footnote <onboarding@resend.dev>",

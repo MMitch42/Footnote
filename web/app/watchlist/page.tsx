@@ -16,7 +16,7 @@ function WatchlistContent() {
   const justUpgraded = searchParams.get("upgraded") === "true";
   const [items, setItems] = useState<WatchedTicker[]>([]);
   const [loading, setLoading] = useState(true);
-  const [plan, setPlan] = useState<"free" | "pro">("free");
+  const [plan, setPlan] = useState<"free" | "pro" | null>(null);
   const [addTicker, setAddTicker] = useState("");
   const [addThreshold, setAddThreshold] = useState(7);
   const [adding, setAdding] = useState(false);
@@ -137,7 +137,7 @@ function WatchlistContent() {
             </form>
             {error && <p className="text-xs text-diff-rem-text mt-2">{error}</p>}
           </div>
-        ) : !loading ? (
+        ) : plan === "free" ? (
           <div className="rounded-xl border border-accent/30 bg-accent/5 px-6 py-6 flex items-start justify-between gap-6">
             <div>
               <p className="text-sm font-semibold text-text-primary mb-1">Footnote Pro: $9/month <span className="text-text-muted font-normal text-xs">early access</span></p>

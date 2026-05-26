@@ -44,5 +44,7 @@ export async function GET(req: Request) {
     return Response.json({ error: error.message }, { status: 500 });
   }
 
-  return Response.redirect(new URL("/watchlist?upgraded=true", req.url), 302);
+  const { searchParams: sp } = new URL(req.url);
+  const next = sp.get("next") ?? "/";
+  return Response.redirect(new URL(next, req.url), 302);
 }
