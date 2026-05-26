@@ -1,8 +1,6 @@
 "use client";
 
-export const dynamic = "force-dynamic";
-
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
@@ -19,7 +17,7 @@ const THRESHOLD_LABELS: Record<number, string> = {
   9: "Critical (9+)",
 };
 
-export default function WatchlistPage() {
+function WatchlistContent() {
   const searchParams = useSearchParams();
   const justUpgraded = searchParams.get("upgraded") === "true";
   const [items, setItems] = useState<WatchedTicker[]>([]);
@@ -233,5 +231,13 @@ export default function WatchlistPage() {
 
       </div>
     </div>
+  );
+}
+
+export default function WatchlistPage() {
+  return (
+    <Suspense>
+      <WatchlistContent />
+    </Suspense>
   );
 }

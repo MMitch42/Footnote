@@ -2,9 +2,6 @@ import { stripe } from "@/lib/stripe";
 import { createServerClient } from "@/lib/supabase";
 import type Stripe from "stripe";
 
-// Tell Next.js not to parse the body — Stripe needs the raw bytes to verify the signature
-export const config = { api: { bodyParser: false } };
-
 export async function POST(req: Request) {
   const body = await req.text();
   const sig = req.headers.get("stripe-signature");
