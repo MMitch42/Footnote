@@ -14,12 +14,16 @@ def get_filings(ticker: str, form: str = "10-K", n: int = 2):
     company = Company(ticker)
     filings = company.get_filings(form=form)
     result = filings.latest(n)
-    # edgartools returns a single EntityFiling (not a list) when only one result exists
     if result is None:
         return []
-    if not isinstance(result, list):
+    # edgartools returns a single EntityFiling (no len) when only one result exists,
+    # and an EntityFilings collection (has len, supports indexing) for multiple results.
+    try:
+        count = len(result)
+        return [result[i] for i in range(count)]
+    except TypeError:
+        # Single EntityFiling object
         return [result]
-    return result
 
 
 def extract_sections(filing) -> dict:
