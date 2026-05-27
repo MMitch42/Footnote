@@ -59,6 +59,56 @@ def _run_historical(job_id: str, ticker: str, form: str, n: int):
         db.update_job(job_id, "error", {"error": str(e)})
 
 
+@app.get("/recent")
+def get_recent(limit: int = 8):
+    """
+    Recent high-novelty filing pairs across all tickers.
+    Used for the homepage live feed.
+    """
+    rows = db.get_recent_diffs(limit=limit * 6)
+
+    pairs: dict = {}
+    for row in rows:
+        key = (row["ticker"], row["filing_type"], row["filing_date_new"], row["filing_date_old"])
+        if key not in pairs:
+            pairs[key] = {
+                "ticker": row["ticker"],
+                "filing_type": row["filing_type"],
+                "date_new": row["filing_date_new"],
+                "date_old": row["filing_date_old"],
+                "scores": [],
+                "directions": [],
+                "computed_at": row.get("computed_at", ""),
+            }
+        for p in (row.get("changed_passages") or []):
+            if p.get("score") is not None:
+                pairs[key]["scores"].append(p["score"])
+            if p.get("direction"):
+                pairs[key]["directions"].append(p["direction"])
+
+    result = []
+    for pair in pairs.values():
+        scores = pair["scores"]
+        if not scores:
+            continue
+        dirs = pair["directions"]
+        esc = dirs.count("escalating")
+        rea = dirs.count("reassuring")
+        result.append({
+            "ticker": pair["ticker"],
+            "filing_type": pair["filing_type"],
+            "date_new": pair["date_new"],
+            "date_old": pair["date_old"],
+            "max_score": max(scores),
+            "n_changes": len(scores),
+            "direction": "escalating" if esc > rea else "reassuring" if rea > esc else "neutral",
+            "computed_at": pair["computed_at"],
+        })
+
+    result.sort(key=lambda x: x["date_new"], reverse=True)
+    return result[:limit]
+
+
 @app.get("/timeline/{ticker}")
 def get_timeline(ticker: str, form: str = "10-K"):
     """

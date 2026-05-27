@@ -20,7 +20,18 @@ function useInView(threshold = 0.12) {
   return { ref, inView };
 }
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL;
+
 type Company = { ticker: string; name: string };
+type RecentEntry = {
+  ticker: string;
+  filing_type: string;
+  date_new: string;
+  date_old: string;
+  max_score: number;
+  n_changes: number;
+  direction: "escalating" | "reassuring" | "neutral";
+};
 
 const DEMO = {
   dateNew: "Oct 2025", dateOld: "Nov 2024",
@@ -72,6 +83,16 @@ export default function Home() {
     };
     requestAnimationFrame(frame);
   }, [statsInView]);
+
+  // Recent feed
+  const [recentFeed, setRecentFeed] = useState<RecentEntry[]>([]);
+  const [feedLoading, setFeedLoading] = useState(true);
+  useEffect(() => {
+    fetch(`${API_URL}/recent?limit=6`)
+      .then((r) => r.ok ? r.json() : [])
+      .then((d) => { setRecentFeed(Array.isArray(d) ? d : []); setFeedLoading(false); })
+      .catch(() => setFeedLoading(false));
+  }, []);
 
   // Scroll fade-in refs
   const { ref: demoRef, inView: demoInView } = useInView();
@@ -253,7 +274,7 @@ export default function Home() {
       <div className="max-w-5xl mx-auto px-6">
 
         {/* Live demo */}
-        <div ref={demoRef} className={`mb-20 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+        <div ref={demoRef} className={`mb-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Real example</span>
             <div className="h-px flex-1 bg-bg-border" />
@@ -306,8 +327,92 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Recent filing changes feed */}
+        {(feedLoading || recentFeed.length > 0) && (
+          <div className="border-t border-bg-border py-14 mb-0">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Recent filing changes</span>
+              </div>
+              <div className="h-px flex-1 bg-bg-border" />
+            </div>
+
+            {feedLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-11 rounded-lg bg-bg-surface animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
+                {recentFeed.map((entry, i) => {
+                  const scoreColor =
+                    entry.max_score >= 9 ? "text-[#f87171]" :
+                    entry.max_score >= 7 ? "text-accent" :
+                    entry.max_score >= 4 ? "text-[#d97706]" : "text-text-muted";
+                  const dotColor =
+                    entry.max_score >= 9 ? "bg-[#f87171]" :
+                    entry.max_score >= 7 ? "bg-accent" :
+                    entry.max_score >= 4 ? "bg-[#d97706]" : "bg-text-muted";
+                  const scoreLabel =
+                    entry.max_score >= 9 ? "Critical" :
+                    entry.max_score >= 7 ? "High" :
+                    entry.max_score >= 4 ? "Notable" : "Low";
+                  const dirLabel =
+                    entry.direction === "escalating" ? "↑ Escalating" :
+                    entry.direction === "reassuring"  ? "↓ Reassuring" : null;
+                  const dirColor =
+                    entry.direction === "escalating" ? "text-[#f87171]" :
+                    entry.direction === "reassuring"  ? "text-diff-add-text" : "";
+
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => router.push(`/diff/${entry.ticker}`)}
+                      className="w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-bg-raised transition-colors duration-100 group"
+                    >
+                      {/* Score dot */}
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+
+                      {/* Ticker + type */}
+                      <div className="flex items-center gap-2 w-28 shrink-0">
+                        <span className="font-mono text-sm font-bold text-text-primary">{entry.ticker}</span>
+                        <span className="font-mono text-[10px] px-1 py-0.5 rounded border border-bg-border text-text-muted uppercase">{entry.filing_type}</span>
+                      </div>
+
+                      {/* Score */}
+                      <div className="flex items-center gap-1.5 w-28 shrink-0">
+                        <span className={`font-mono text-sm font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
+                        <span className={`text-xs ${scoreColor}`}>{scoreLabel}</span>
+                      </div>
+
+                      {/* Direction */}
+                      <span className={`text-xs w-24 shrink-0 ${dirColor || "text-text-muted"}`}>
+                        {dirLabel ?? "Neutral"}
+                      </span>
+
+                      {/* Date range */}
+                      <span className="font-mono text-xs text-text-muted hidden sm:block flex-1">
+                        {entry.date_old} <span className="text-accent">→</span> {entry.date_new}
+                      </span>
+
+                      {/* Changes count */}
+                      <span className="text-xs text-text-muted hidden md:block w-20 text-right shrink-0">
+                        {entry.n_changes} change{entry.n_changes !== 1 ? "s" : ""}
+                      </span>
+
+                      <span className="text-text-muted group-hover:text-accent transition-colors text-sm shrink-0">→</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Stats */}
-        <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10 mb-14">
+        <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10">
           <div>
             <p className="font-mono text-5xl font-bold text-text-primary mb-1 tabular-nums">
               {bps}<span className="text-accent">bps</span>
@@ -323,15 +428,18 @@ export default function Home() {
               language underperform by 22% annually. Institutional research platforms charge up to
               $15,000/year for this signal.
             </p>
-            <div className="flex items-center gap-3 mt-5 flex-wrap">
-              <div className="flex items-baseline gap-2">
-                <span className="text-text-muted font-normal line-through text-sm">$29</span>
-                <span className="text-base font-semibold text-accent">$9/month</span>
-                <span className="text-sm text-text-muted font-normal">early access</span>
+            <div className="mt-6 space-y-3">
+              <div>
+                <div className="flex items-end gap-2 mb-1">
+                  <span className="font-mono text-3xl font-bold text-text-primary">$9</span>
+                  <span className="text-sm text-text-secondary mb-1">/month</span>
+                  <span className="text-sm text-text-secondary line-through mb-1">$29</span>
+                </div>
+                <p className="text-xs font-semibold text-accent">Early access. Locked in for life.</p>
               </div>
               <a
                 href="/upgrade"
-                className="text-sm font-medium px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors"
+                className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
               >
                 Subscribe →
               </a>
@@ -340,7 +448,7 @@ export default function Home() {
         </div>
 
         {/* How it works */}
-        <div ref={howRef} className={`border-t border-bg-border py-14 mb-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+        <div ref={howRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">How it works</p>
           <p className="text-sm text-text-secondary mb-10 max-w-lg">
             Built for investors, analysts, and anyone who tracks public companies. No more manually reading filings to see what changed.
@@ -359,7 +467,7 @@ export default function Home() {
         </div>
 
         {/* Waitlist */}
-        <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 mb-6 transition-all duration-700 delay-150 ${waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+        <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-150 ${waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <div className="max-w-lg">
             <p className="text-lg font-semibold text-text-primary mb-1">Not ready to subscribe?</p>
             <p className="text-sm text-text-muted mb-6">Leave your email and we&apos;ll let you know when new features ship. No credit card, no spam.</p>

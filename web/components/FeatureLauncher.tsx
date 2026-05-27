@@ -187,39 +187,7 @@ export function FeatureLauncher() {
               )}
             </section>
 
-            {/* ③ RESEARCH HISTORY */}
-            <section className="px-4 py-3 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <p className={sectionLabel}>Research history</p>
-                {!canResearch && <span className={lockBadge}>Research</span>}
-              </div>
-              <p className={canResearch ? bodyText : bodyDim}>
-                Full filing history with a novelty score timeline across 5+ years of consecutive diffs.
-              </p>
-              {canResearch ? (
-                watchlist.length > 0 ? (
-                  <div className="flex flex-wrap gap-1.5">
-                    {watchlist.slice(0, 8).map((item) => (
-                      <button
-                        key={item.ticker}
-                        onClick={() => go(`/history/${item.ticker}`)}
-                        className="font-mono text-[10px] font-semibold px-2 py-1 rounded border border-accent/40 text-accent hover:bg-accent/10 transition-colors"
-                      >
-                        {item.ticker}
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className={bodyDim}>Add tickers to your watchlist first.</p>
-                )
-              ) : (
-                <button onClick={() => go("/upgrade")} className="text-[11px] font-semibold text-text-muted hover:text-accent transition-colors">
-                  Upgrade to Research →
-                </button>
-              )}
-            </section>
-
-            {/* ④ ASK AI */}
+            {/* ③ ASK AI */}
             <section className="px-4 py-3 space-y-2.5">
               <div className="flex items-center justify-between">
                 <p className={sectionLabel}>Ask AI</p>
@@ -228,10 +196,19 @@ export function FeatureLauncher() {
               <p className={canAlert ? bodyText : bodyDim}>
                 Ask questions about any filing, disclosure category, or language change in plain English.
               </p>
-              {canAlert && (
+              {canAlert ? (
                 <p className={bodyDim}>
                   Use the <span className="text-accent">✦</span> button in the bottom-right corner.
                 </p>
+              ) : (
+                <>
+                  <p className="text-[11px] text-text-muted leading-relaxed">
+                    Included with Pro. Get plain-English explanations of any SEC disclosure, ask follow-up questions, and understand what specific language changes actually mean.
+                  </p>
+                  <button onClick={() => go("/upgrade")} className="text-[11px] font-semibold text-accent hover:text-accent-bright transition-colors">
+                    Upgrade to Pro for $9/mo →
+                  </button>
+                </>
               )}
             </section>
 

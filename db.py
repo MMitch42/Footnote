@@ -106,6 +106,19 @@ def get_filing(ticker: str, filing_type: str, filing_date: str):
     return result.data[0] if result.data else None
 
 
+def get_recent_diffs(limit: int = 48) -> list:
+    """Return recent diff rows across all tickers for homepage feed."""
+    client = get_client()
+    result = (
+        client.table("diffs")
+        .select("ticker,filing_type,filing_date_new,filing_date_old,changed_passages,computed_at")
+        .order("filing_date_new", desc=True)
+        .limit(limit)
+        .execute()
+    )
+    return result.data if result.data else []
+
+
 def list_diffs_raw(ticker: str, filing_type: str) -> list:
     """Return all cached diff rows for a ticker — used to build the timeline."""
     client = get_client()

@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useEffect, useRef, useState } from "react";
+import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
@@ -90,14 +90,55 @@ function generateInterpretation(
   return `${ticker}'s ${filingType} contains ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highEsc} escalating and ${highRea} reassuring (${esc} vs ${rea} across all changes). The direction is mixed. Read the individual findings below.`;
 }
 
+/* ── Word-level diff ─────────────────────────────────────────── */
+type WordOp = { type: "keep" | "del" | "ins"; text: string };
+
+function computeWordDiff(oldText: string, newText: string): WordOp[] | null {
+  const a = oldText.trim().split(/\s+/).filter(Boolean);
+  const b = newText.trim().split(/\s+/).filter(Boolean);
+  if (a.length > 500 || b.length > 500) return null; // too large to diff word-by-word
+
+  const m = a.length, n = b.length;
+  // LCS DP table
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0) as number[]);
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+  // Backtrack
+  const ops: WordOp[] = [];
+  let i = m, j = n;
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
+      ops.unshift({ type: "keep", text: a[i - 1] });
+      i--; j--;
+    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
+      ops.unshift({ type: "ins", text: b[j - 1] });
+      j--;
+    } else {
+      ops.unshift({ type: "del", text: a[i - 1] });
+      i--;
+    }
+  }
+  return ops;
+}
+
 /* ── Briefing panel ─────────────────────────────────────────── */
 function BriefingPanel({
   data, passages, highPassages, onSelectPassage,
+  plan, watching, watchLoading, onToggleWatch,
 }: {
   data: DiffResult;
   passages: Passage[];
   highPassages: Passage[];
   onSelectPassage: (idx: number) => void;
+  plan: string;
+  watching: boolean;
+  watchLoading: boolean;
+  onToggleWatch: () => void;
 }) {
   const highEsc = highPassages.filter((p) => p.direction === "escalating").length;
   const highRea = highPassages.filter((p) => p.direction === "reassuring").length;
@@ -138,6 +179,61 @@ function BriefingPanel({
           <p className="text-[11px] text-text-secondary mt-0.5">Direction</p>
         </div>
       </div>
+
+      {/* Watch CTA */}
+      {plan === "free" ? (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text-primary mb-0.5">Get alerted next time</p>
+              <p className="text-xs text-text-muted leading-relaxed">
+                Know when the next {data.filing_type} drops before most investors notice.
+              </p>
+            </div>
+            <a
+              href="/upgrade"
+              className="shrink-0 text-xs font-bold px-3 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap"
+            >
+              Get Pro · $9/mo
+            </a>
+          </div>
+        </div>
+      ) : watching ? (
+        <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 flex items-center gap-3">
+          <span className="text-accent text-lg shrink-0">★</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-text-primary">Watching {data.ticker}</p>
+            <p className="text-xs text-text-muted">
+              You&apos;ll be alerted when the next {data.filing_type} drops.
+            </p>
+          </div>
+          <button
+            onClick={onToggleWatch}
+            disabled={watchLoading}
+            className="text-[11px] text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 shrink-0"
+          >
+            {watchLoading ? "…" : "Unwatch"}
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-lg border border-bg-border bg-bg-raised px-4 py-3">
+          <div className="flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-text-primary mb-0.5">☆ Watch {data.ticker}</p>
+              <p className="text-xs text-text-muted leading-relaxed">
+                Get emailed the moment the next {data.filing_type} drops.
+              </p>
+            </div>
+            <button
+              onClick={onToggleWatch}
+              disabled={watchLoading}
+              className="shrink-0 text-xs font-bold px-3 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap disabled:opacity-50"
+            >
+              {watchLoading ? "…" : "Watch →"}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Interpretation */}
       <div>
@@ -271,17 +367,59 @@ function PassageRow({
 }
 
 /* ── Right panel: passage detail ───────────────────────────── */
-function PassageDetail({ passage, onBack }: { passage: Passage; onBack: () => void }) {
+function PassageDetail({
+  passage, onBack, isPro,
+}: {
+  passage: Passage;
+  onBack: () => void;
+  isPro: boolean;
+}) {
+  const [showWordDiff, setShowWordDiff] = useState(false);
+
+  // Compute word diff lazily (only for Pro, only when text exists)
+  const wordDiffOps = useMemo(
+    () =>
+      isPro && passage.old && passage.new
+        ? computeWordDiff(passage.old, passage.new)
+        : null,
+    [isPro, passage.old, passage.new]
+  );
+
+  const hasWordDiff = wordDiffOps !== null;
+
   return (
     <div>
-      <div className="px-6 py-2.5 border-b border-bg-border bg-bg-base flex items-center">
+      {/* Header bar */}
+      <div className="px-6 py-2.5 border-b border-bg-border bg-bg-base flex items-center justify-between">
         <button
           onClick={onBack}
           className="text-xs text-text-muted hover:text-accent transition-colors duration-150"
         >
           ← Overview
         </button>
+        {isPro && hasWordDiff && (
+          <button
+            onClick={() => setShowWordDiff((w) => !w)}
+            className={`flex items-center gap-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider px-2.5 py-1 rounded border transition-colors duration-150 ${
+              showWordDiff
+                ? "border-accent text-accent bg-accent/10"
+                : "border-bg-border text-text-muted hover:border-accent hover:text-accent"
+            }`}
+          >
+            {showWordDiff ? (
+              <>
+                <span className="inline-block w-2 h-2 rounded-sm bg-diff-rem-text/70 opacity-80" />
+                <span className="inline-block w-2 h-2 rounded-sm bg-diff-add-text/70 opacity-80 -ml-0.5" />
+                Word diff on
+              </>
+            ) : (
+              <>Word diff</>
+            )}
+          </button>
+        )}
       </div>
+
+      {/* Explanation + score */}
       <div className="px-6 py-5 border-b border-bg-border bg-bg-surface flex items-start justify-between gap-6">
         <p className="text-sm text-text-secondary leading-relaxed flex-1">
           {passage.explanation ?? "Language change detected."}
@@ -295,25 +433,79 @@ function PassageDetail({ passage, onBack }: { passage: Passage; onBack: () => vo
           )}
         </div>
       </div>
-      {passage.old && (
-        <div className="border-b border-bg-border">
-          <div className="px-6 py-2 bg-diff-rem border-b border-bg-border/50">
-            <span className="text-xs font-medium text-diff-rem-text/70 uppercase tracking-wide">Removed</span>
-          </div>
-          <div className="px-6 py-5 bg-diff-rem/30">
-            <p className="font-mono text-sm text-diff-rem-text leading-relaxed">{passage.old}</p>
-          </div>
-        </div>
-      )}
-      {passage.new && (
+
+      {showWordDiff && wordDiffOps ? (
+        /* ── Inline word diff view ──────────────────────────── */
         <div>
-          <div className="px-6 py-2 bg-diff-add border-b border-bg-border/50">
-            <span className="text-xs font-medium text-diff-add-text/70 uppercase tracking-wide">Added</span>
+          <div className="px-6 py-2 bg-bg-raised border-b border-bg-border/50 flex items-center justify-between">
+            <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Inline diff</span>
+            <div className="flex items-center gap-3 text-[10px] text-text-muted">
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-sm bg-diff-rem/60" />
+                removed
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="inline-block w-3 h-3 rounded-sm bg-diff-add/60" />
+                added
+              </span>
+            </div>
           </div>
-          <div className="px-6 py-5 bg-diff-add/30">
-            <p className="font-mono text-sm text-diff-add-text leading-relaxed">{passage.new}</p>
+          <div className="px-6 py-5">
+            <p className="font-mono text-sm leading-relaxed text-text-primary">
+              {wordDiffOps.map((op, idx) => {
+                const sp = idx > 0 ? " " : "";
+                if (op.type === "keep") {
+                  return <span key={idx}>{sp}{op.text}</span>;
+                }
+                if (op.type === "del") {
+                  return (
+                    <span key={idx}>
+                      {sp}
+                      <mark className="bg-diff-rem/50 text-diff-rem-text line-through px-0.5 rounded-sm not-italic">
+                        {op.text}
+                      </mark>
+                    </span>
+                  );
+                }
+                if (op.type === "ins") {
+                  return (
+                    <span key={idx}>
+                      {sp}
+                      <mark className="bg-diff-add/50 text-diff-add-text px-0.5 rounded-sm not-italic font-semibold">
+                        {op.text}
+                      </mark>
+                    </span>
+                  );
+                }
+                return null;
+              })}
+            </p>
           </div>
         </div>
+      ) : (
+        /* ── Standard split view ────────────────────────────── */
+        <>
+          {passage.old && (
+            <div className="border-b border-bg-border">
+              <div className="px-6 py-2 bg-diff-rem border-b border-bg-border/50">
+                <span className="text-xs font-medium text-diff-rem-text/70 uppercase tracking-wide">Removed</span>
+              </div>
+              <div className="px-6 py-5 bg-diff-rem/30">
+                <p className="font-mono text-sm text-diff-rem-text leading-relaxed">{passage.old}</p>
+              </div>
+            </div>
+          )}
+          {passage.new && (
+            <div>
+              <div className="px-6 py-2 bg-diff-add border-b border-bg-border/50">
+                <span className="text-xs font-medium text-diff-add-text/70 uppercase tracking-wide">Added</span>
+              </div>
+              <div className="px-6 py-5 bg-diff-add/30">
+                <p className="font-mono text-sm text-diff-add-text leading-relaxed">{passage.new}</p>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -532,6 +724,29 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
             </span>
           </div>
 
+          {/* Alert banner for free users */}
+          {plan === "free" && (() => {
+            const daysAgo = Math.floor((Date.now() - new Date(data.date_new).getTime()) / (1000 * 60 * 60 * 24));
+            if (daysAgo < 1) return null;
+            const urgentChanges = highPassages.length;
+            return (
+              <div className="shrink-0 px-4 py-2.5 bg-accent/8 border-b border-accent/20 flex items-center justify-between gap-4 flex-wrap">
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  <span className="text-accent font-semibold">Pro subscribers were alerted {daysAgo} day{daysAgo !== 1 ? "s" : ""} ago</span>
+                  {urgentChanges > 0
+                    ? ` with ${urgentChanges} high-novelty change${urgentChanges !== 1 ? "s" : ""} flagged in this ${data.filing_type}.`
+                    : ` when this ${data.filing_type} dropped.`}
+                </p>
+                <a
+                  href="/upgrade"
+                  className="shrink-0 text-xs font-semibold px-3 py-1.5 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap"
+                >
+                  Get Pro for $9/mo →
+                </a>
+              </div>
+            );
+          })()}
+
           {/* Filter bar */}
           <div className="shrink-0 border-b border-bg-border bg-bg-base flex overflow-x-auto">
             {(["all", "high", "item_1a", "item_7", "item_3"] as SectionFilter[]).map((f) => {
@@ -586,13 +801,22 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
             {/* Right: briefing or detail */}
             <div className="flex-1 overflow-y-auto">
               {selected !== null ? (
-                <PassageDetail passage={selected} onBack={() => setSelectedIdx(null)} />
+                <PassageDetail
+                  key={selectedIdx ?? 0}
+                  passage={selected}
+                  onBack={() => setSelectedIdx(null)}
+                  isPro={plan !== "free"}
+                />
               ) : (
                 <BriefingPanel
                   data={data}
                   passages={allPassages}
                   highPassages={highPassages}
                   onSelectPassage={(idx) => { setFilter("all"); setSelectedIdx(idx); }}
+                  plan={plan}
+                  watching={watching}
+                  watchLoading={watchLoading}
+                  onToggleWatch={toggleWatch}
                 />
               )}
             </div>
