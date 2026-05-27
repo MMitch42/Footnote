@@ -1,3 +1,5 @@
+import gc
+import os
 import uuid
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -14,9 +16,49 @@ app.add_middleware(
 )
 
 
+TOP_TICKERS = [
+    "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL",
+    "META", "TSLA", "LLY",  "AVGO", "WMT",
+    "JPM",  "ORCL", "XOM",  "NFLX", "COST",
+    "AMD",  "UNH",  "PG",   "V",    "JNJ",
+    "BAC",  "MA",   "ABBV", "KO",   "MRK",
+    "CVX",  "CSCO", "CRM",  "ACN",  "TMO",
+]
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.get("/prefetch")
+def prefetch(secret: str = None):
+    """
+    Pre-warm the diff cache for the top 30 tickers.
+    Called by the Vercel cron — processes tickers one at a time so Railway
+    never holds more than one pipeline run in memory simultaneously.
+    Explicit gc.collect() between tickers keeps RSS stable across the full run.
+    """
+    cron_secret = os.getenv("CRON_SECRET")
+    if cron_secret and secret != cron_secret:
+        from fastapi.responses import JSONResponse
+        return JSONResponse({"error": "Unauthorized"}, status_code=401)
+
+    results: dict[str, str] = {}
+    for ticker in TOP_TICKERS:
+        try:
+            alert_mode(ticker, form="10-K")
+            results[ticker] = "ok"
+            print(f"  [prefetch] {ticker} warmed", flush=True)
+        except Exception as e:
+            results[ticker] = str(e)
+            print(f"  [prefetch] {ticker} error: {e}", flush=True)
+        finally:
+            gc.collect()  # free filing text + diff arrays before next ticker
+
+    ok = sum(1 for v in results.values() if v == "ok")
+    print(f"[prefetch] done — {ok}/{len(TOP_TICKERS)} ok", flush=True)
+    return {"ok": ok, "total": len(TOP_TICKERS), "results": results}
 
 
 @app.get("/alert/{ticker}")

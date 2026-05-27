@@ -1,22 +1,12 @@
 /**
- * Prefetch diffs for the top 20 US companies by market cap.
- * Run weekly (Sunday 8am UTC) so popular tickers always load instantly.
- * Also callable manually for initial population — protect with CRON_SECRET.
+ * Trigger Railway's /prefetch endpoint, which warms the diff cache for the
+ * top 30 tickers one at a time — no concurrent pipeline runs, no OOM.
+ * Run weekly (Sunday 8am UTC); also callable manually with ?secret=.
  */
 
-export const maxDuration = 300; // 5 min — needs to be on Pro plan or higher
-
-const TOP_TICKERS = [
-  "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL",
-  "META", "TSLA", "LLY",  "AVGO", "WMT",
-  "JPM",  "ORCL", "XOM",  "NFLX", "COST",
-  "AMD",  "UNH",  "PG",   "V",    "JNJ",
-  "BAC",  "MA",   "ABBV", "KO",   "MRK",
-  "CVX",  "CSCO", "CRM",  "ACN",  "TMO",
-];
+export const maxDuration = 300; // 5 min — needs Pro plan or higher
 
 export async function GET(req: Request) {
-  // Allow Vercel cron (Authorization: Bearer <CRON_SECRET>) or manual with ?secret=
   const authHeader = req.headers.get("authorization");
   const url = new URL(req.url);
   const secret = process.env.CRON_SECRET;
@@ -33,27 +23,20 @@ export async function GET(req: Request) {
     return Response.json({ error: "NEXT_PUBLIC_API_URL not set" }, { status: 500 });
   }
 
-  const results: Record<string, string> = {};
-
-  for (const ticker of TOP_TICKERS) {
-    try {
-      const res = await fetch(`${apiUrl}/alert/${ticker}?form=10-K`, {
-        signal: AbortSignal.timeout(60_000), // 60s per ticker
-      });
-      const ok = res.ok;
-      const status = res.status;
-      // Always drain/cancel the body — unread streams accumulate and OOM the function
-      try { await res.body?.cancel(); } catch { /* ignore */ }
-      results[ticker] = ok ? "ok" : `http ${status}`;
-    } catch (e) {
-      results[ticker] = e instanceof Error ? e.message : "error";
-    }
-    // Small pause — Railway is a single instance, don't hammer it
-    await new Promise((r) => setTimeout(r, 500));
+  // Railway runs the full loop internally — one ticker at a time, GC between each.
+  // We give it 4 min 40s; even if Vercel times out, Railway keeps going and
+  // populates the cache for the remaining tickers.
+  try {
+    const res = await fetch(
+      `${apiUrl}/prefetch?secret=${encodeURIComponent(secret ?? "")}`,
+      { signal: AbortSignal.timeout(280_000) }
+    );
+    const body = await res.json().catch(() => ({}));
+    return Response.json(body, { status: res.ok ? 200 : res.status });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "error";
+    // TimeoutError just means Vercel's window closed — Railway is still running.
+    console.log(`[prefetch] fetch ended: ${msg}`);
+    return Response.json({ note: msg }, { status: 202 });
   }
-
-  const ok = Object.values(results).filter((v) => v === "ok").length;
-  console.log(`[prefetch] ${ok}/${TOP_TICKERS.length} tickers warmed`, results);
-
-  return Response.json({ ok, total: TOP_TICKERS.length, results });
 }
