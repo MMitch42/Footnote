@@ -20,18 +20,10 @@ const PRO_FEATURES = [
   "Weekly digest emails (opt-in)",
 ];
 
-const RESEARCH_FEATURES = [
-  "Everything in Pro",
-  "Full filing history back to 2005",
-  "Novelty score timeline chart",
-  "Historical diff for any two filing dates",
-];
-
-type Tier = "pro" | "research";
 type Plan = "free" | "pro" | "research" | null;
 
 export default function UpgradePage() {
-  const [loading, setLoading] = useState<Tier | null>(null);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<Plan>(null);
   const router = useRouter();
@@ -45,37 +37,36 @@ export default function UpgradePage() {
       .catch(() => setPlan("free"));
   }, [isSignedIn]);
 
-  const handleCheckout = async (tier: Tier) => {
-    setLoading(tier);
+  const handleCheckout = async () => {
+    setLoading(true);
     setError(null);
     try {
       const res = await fetch("/api/stripe/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tier }),
+        body: JSON.stringify({ tier: "pro" }),
       });
       const data = await res.json();
       if (data.url) {
         router.push(data.url);
       } else {
         setError(data.error ?? "Something went wrong");
-        setLoading(null);
+        setLoading(false);
       }
     } catch {
       setError("Could not start checkout. Try again.");
-      setLoading(null);
+      setLoading(false);
     }
   };
 
   const alreadyPro = plan === "pro" || plan === "research";
-  const alreadyResearch = plan === "research";
 
   return (
     <div className="min-h-screen bg-bg-base flex flex-col">
       {/* Nav */}
       <nav className="border-b border-bg-border">
         <div className="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between">
-          <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors">
+          <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors ml-10">
             FOOTNOTE
           </Link>
           <button onClick={() => router.back()} className="text-sm text-text-secondary hover:text-text-primary transition-colors">
@@ -94,8 +85,8 @@ export default function UpgradePage() {
           </p>
         </div>
 
-        {/* Pricing grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
+        {/* Pricing grid — 2 columns, centered */}
+        <div className="max-w-2xl mx-auto grid grid-cols-1 sm:grid-cols-2 gap-6 items-start">
 
           {/* Free */}
           <div className="rounded-xl border border-bg-border bg-bg-surface p-6 flex flex-col gap-5">
@@ -153,7 +144,7 @@ export default function UpgradePage() {
               </div>
             </div>
 
-            {/* CTA — hidden once already on Pro */}
+            {/* CTA */}
             {!alreadyPro ? (
               isLoaded && !isSignedIn ? (
                 <a
@@ -164,11 +155,11 @@ export default function UpgradePage() {
                 </a>
               ) : (
                 <button
-                  onClick={() => handleCheckout("pro")}
-                  disabled={loading !== null || !isLoaded}
+                  onClick={handleCheckout}
+                  disabled={loading || !isLoaded}
                   className="w-full h-10 bg-accent text-bg-base text-sm font-semibold rounded-lg hover:bg-accent-bright transition-colors disabled:opacity-60"
                 >
-                  {loading === "pro" ? "Redirecting..." : "Subscribe"}
+                  {loading ? "Redirecting..." : "Subscribe"}
                 </button>
               )
             ) : (
@@ -183,54 +174,6 @@ export default function UpgradePage() {
                 <li key={f} className="flex items-start gap-2.5">
                   <span className="text-accent text-sm shrink-0 mt-0.5">✓</span>
                   <span className={`text-sm leading-snug ${f === "Everything in Free" ? "text-text-muted" : "text-text-secondary"}`}>
-                    {f}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </div>
-
-          {/* Research */}
-          <div className="rounded-xl border border-bg-border bg-bg-surface p-6 flex flex-col gap-5">
-            <p className="font-mono text-xs text-text-muted uppercase tracking-widest">Research</p>
-
-            <div>
-              <div className="flex items-end gap-2 mb-1">
-                <span className="font-mono text-4xl font-bold text-text-primary">$49</span>
-                <span className="text-sm text-text-secondary mb-1">/month</span>
-              </div>
-              <p className="text-xs text-text-muted">For analysts and serious investors.</p>
-            </div>
-
-            {!alreadyResearch ? (
-              isLoaded && !isSignedIn ? (
-                <a
-                  href="/sign-in?redirect_url=/upgrade"
-                  className="w-full h-10 flex items-center justify-center border border-accent/40 text-sm text-accent rounded-lg hover:bg-accent/5 transition-colors"
-                >
-                  Subscribe
-                </a>
-              ) : (
-                <button
-                  onClick={() => handleCheckout("research")}
-                  disabled={loading !== null || !isLoaded}
-                  className="w-full h-10 border border-accent/40 text-accent text-sm font-semibold rounded-lg hover:bg-accent/5 transition-colors disabled:opacity-60"
-                >
-                  {loading === "research" ? "Redirecting..." : "Subscribe"}
-                </button>
-              )
-            ) : (
-              <div className="w-full h-10 flex items-center justify-center rounded-lg border border-accent/30 gap-2">
-                <span className="text-xs font-mono text-accent">✓</span>
-                <span className="text-sm font-semibold text-accent">Current plan</span>
-              </div>
-            )}
-
-            <ul className="space-y-2.5">
-              {RESEARCH_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-2.5">
-                  <span className="text-accent text-sm shrink-0 mt-0.5">✓</span>
-                  <span className={`text-sm leading-snug ${f === "Everything in Pro" ? "text-text-muted" : "text-text-secondary"}`}>
                     {f}
                   </span>
                 </li>

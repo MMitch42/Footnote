@@ -52,7 +52,15 @@ export default function Home() {
   const [ticker, setTicker] = useState("");
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
   const router = useRouter();
+
+  useEffect(() => {
+    fetch("/api/subscription")
+      .then((r) => r.ok ? r.json() : { plan: "free" })
+      .then((d) => setPlan(d.plan ?? "free"))
+      .catch(() => setPlan("free"));
+  }, []);
 
   // Typewriter
   const [typed, setTyped] = useState("");
@@ -176,7 +184,7 @@ export default function Home() {
       {/* Nav */}
       <nav className="relative z-10 border-b border-bg-border">
         <div className="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between">
-          <span className="font-mono text-sm font-bold text-text-primary tracking-tight">FOOTNOTE</span>
+          <span className="font-mono text-sm font-bold text-text-primary tracking-tight ml-10">FOOTNOTE</span>
           <div className="flex items-center gap-4">
             <Show when="signed-out">
               <a
@@ -199,6 +207,14 @@ export default function Home() {
               >
                 Watchlist
               </a>
+              {plan === "free" && (
+                <a
+                  href="/upgrade"
+                  className="text-sm font-semibold px-4 h-8 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap"
+                >
+                  Get Pro →
+                </a>
+              )}
               <UserButton
                 appearance={{
                   variables: { colorPrimary: "#f59e0b" },

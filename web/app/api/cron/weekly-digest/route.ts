@@ -57,18 +57,21 @@ export async function GET(req: Request) {
   }
   console.log(`[weekly-digest] ${watchEntries.length} watchlist entries loaded`);
 
-  // 2. Only send to Pro/Research users
-  const { data: subs } = await sb
-    .from("subscriptions")
-    .select("user_id, plan")
-    .in("plan", ["pro", "research"]);
+  // 2. Only send to Pro/Research users who have opted in to the digest
+  const [{ data: subs }, { data: prefs }] = await Promise.all([
+    sb.from("subscriptions").select("user_id, plan").in("plan", ["pro", "research"]),
+    sb.from("user_preferences").select("user_id").eq("digest_opt_in", true),
+  ]);
 
   const proUserIds = new Set((subs ?? []).map((s: { user_id: string }) => s.user_id));
+  const optInUserIds = new Set((prefs ?? []).map((p: { user_id: string }) => p.user_id));
+  console.log(`[weekly-digest] ${proUserIds.size} pro users, ${optInUserIds.size} opted in`);
 
-  // 3. Group watchlist by user (Pro users only)
+  // 3. Group watchlist by user (Pro users who opted in only)
   const watchlistByUser: Record<string, string[]> = {};
   for (const entry of watchEntries as { user_id: string; ticker: string }[]) {
     if (!proUserIds.has(entry.user_id)) continue;
+    if (!optInUserIds.has(entry.user_id)) continue;
     if (!watchlistByUser[entry.user_id]) watchlistByUser[entry.user_id] = [];
     watchlistByUser[entry.user_id].push(entry.ticker);
   }

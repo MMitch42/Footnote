@@ -17,19 +17,12 @@ export function FeatureLauncher() {
   const [activeIdx, setActiveIdx] = useState(-1);
   const inputRef = useRef<HTMLInputElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
   const { isSignedIn, isLoaded } = useUser();
   const pathname = usePathname();
   const router = useRouter();
 
-  // Hide on auth / legal pages
-  if (
-    !pathname ||
-    pathname.startsWith("/sign-") ||
-    pathname.startsWith("/terms") ||
-    pathname.startsWith("/privacy")
-  ) {
-    return null;
-  }
+  // ── ALL hooks must be unconditional — early returns come after ──
 
   // Fetch plan + watchlist when opened
   useEffect(() => {
@@ -43,7 +36,7 @@ export function FeatureLauncher() {
     }).catch(() => {});
   }, [open, isSignedIn]);
 
-  // Focus search when opened
+  // Focus search input when panel opens
   useEffect(() => {
     if (open) setTimeout(() => inputRef.current?.focus(), 60);
   }, [open]);
@@ -61,17 +54,42 @@ export function FeatureLauncher() {
     return () => clearTimeout(id);
   }, [query]);
 
-  // Close on outside click
+  // Close on outside click — exclude the toggle button to avoid mousedown/click race
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      const target = e.target as Node;
+      if (
+        panelRef.current && !panelRef.current.contains(target) &&
+        buttonRef.current && !buttonRef.current.contains(target)
+      ) {
         setOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [open]);
+
+  // ── Early returns after all hooks ──
+
+  // Hide on auth / legal pages
+  if (
+    !pathname ||
+    pathname.startsWith("/sign-") ||
+    pathname.startsWith("/terms") ||
+    pathname.startsWith("/privacy")
+  ) {
+    return null;
+  }
+
+  if (!isLoaded) return null;
+
+  const canAlert = plan === "pro" || plan === "research";
+
+  const sectionLabel = "text-[9px] font-mono font-bold text-text-muted uppercase tracking-[0.12em]";
+  const lockBadge    = "text-[9px] font-mono text-text-muted uppercase tracking-wider";
+  const bodyText     = "text-[11px] text-text-secondary leading-relaxed";
+  const bodyDim      = "text-[11px] text-text-muted leading-relaxed";
 
   const go = (path: string) => { setOpen(false); setQuery(""); setSuggestions([]); router.push(path); };
   const analyzeTicker = (ticker: string) => go(`/diff/${ticker.toUpperCase()}`);
@@ -87,20 +105,6 @@ export function FeatureLauncher() {
       else if (query.trim()) analyzeTicker(query.trim().split(/\s+/)[0]);
     }
   };
-
-  if (!isLoaded) return null;
-
-  const canResearch = plan === "research";
-  const canAlert    = plan === "pro" || plan === "research";
-
-  // Section header style — small mono label
-  const sectionLabel = "text-[9px] font-mono font-bold text-text-muted uppercase tracking-[0.12em]";
-  // Plan lock badge
-  const lockBadge = "text-[9px] font-mono text-text-muted uppercase tracking-wider";
-  // Body copy inside sections
-  const bodyText = "text-[11px] text-text-secondary leading-relaxed";
-  // Dimmed body for locked sections
-  const bodyDim = "text-[11px] text-text-muted leading-relaxed";
 
   return (
     <>
@@ -212,26 +216,32 @@ export function FeatureLauncher() {
               )}
             </section>
 
-            {/* ⑤ ACCOUNT */}
+            {/* ④ ACCOUNT */}
             <section className="px-4 py-3 space-y-2.5">
               <p className={sectionLabel}>Account</p>
               {isSignedIn && plan !== null ? (
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={bodyDim}>Plan:</span>
-                    <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                      plan === "research" ? "border-accent/50 text-accent" :
-                      plan === "pro"      ? "border-text-muted text-text-muted" :
-                                           "border-bg-border text-text-muted"
-                    }`}>
-                      {plan}
-                    </span>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className={bodyDim}>Plan:</span>
+                      <span className={`font-mono text-[10px] font-bold px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                        plan === "research" ? "border-accent/50 text-accent" :
+                        plan === "pro"      ? "border-accent/50 text-accent" :
+                                             "border-bg-border text-text-muted"
+                      }`}>
+                        {plan}
+                      </span>
+                    </div>
+                    {plan === "free" ? (
+                      <button onClick={() => go("/upgrade")} className="text-[11px] font-semibold text-accent hover:text-accent-bright transition-colors">
+                        Upgrade →
+                      </button>
+                    ) : (
+                      <button onClick={() => go("/account")} className="text-[11px] text-text-muted hover:text-text-secondary transition-colors">
+                        Manage →
+                      </button>
+                    )}
                   </div>
-                  {plan !== "research" && (
-                    <button onClick={() => go("/upgrade")} className="text-[11px] font-semibold text-accent hover:text-accent-bright transition-colors">
-                      Upgrade →
-                    </button>
-                  )}
                 </div>
               ) : (
                 <button onClick={() => go("/sign-in")} className="text-[11px] font-semibold text-accent hover:text-accent-bright transition-colors">
@@ -244,8 +254,9 @@ export function FeatureLauncher() {
         </div>
       )}
 
-      {/* ── Toggle button (top-left, amber so it's visible) ── */}
+      {/* ── Toggle button ── */}
       <button
+        ref={buttonRef}
         onClick={() => setOpen((o) => !o)}
         className="fixed top-2 left-2 sm:top-2.5 sm:left-3 w-8 h-8 bg-accent text-bg-base rounded-md shadow-md hover:bg-accent-bright transition-all duration-150 z-50 flex items-center justify-center text-sm font-bold select-none"
         title="Menu"
