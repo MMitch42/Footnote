@@ -550,7 +550,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
     const url = isHistorical
       ? `${API_URL}/diff/${ticker}?date_new=${dateNew}&date_old=${dateOld}`
-      : `${API_URL}/alert/${ticker}?filing_type=${filingType}`;
+      : `${API_URL}/alert/${ticker}?form=${filingType}`;
     fetch(url)
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false); })
@@ -570,6 +570,10 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
   const switchFilingType = (type: "10-K" | "10-Q") => {
     if (type === filingType) return;
+    if (type === "10-Q" && plan === "free") {
+      router.push("/upgrade");
+      return;
+    }
     setFilingType(type);
     router.replace(`/diff/${ticker}?type=${type}`, { scroll: false });
   };
@@ -745,29 +749,9 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               </Link>
             )}
             <span className="font-mono text-sm font-bold text-text-primary uppercase tracking-wide shrink-0">{data.ticker}</span>
-            {/* Filing type toggle */}
-            {!isHistorical && (
-              <div className="flex items-center gap-1 shrink-0">
-                {(["10-K", "10-Q"] as const).map((ft) => (
-                  <button
-                    key={ft}
-                    onClick={() => switchFilingType(ft)}
-                    className={`font-mono text-[10px] px-2 py-1 rounded border uppercase tracking-wider transition-colors duration-150 ${
-                      filingType === ft
-                        ? "border-accent text-accent bg-accent/10"
-                        : "border-bg-border text-text-muted hover:border-accent/50 hover:text-text-secondary"
-                    }`}
-                  >
-                    {ft}
-                  </button>
-                ))}
-              </div>
-            )}
-            {isHistorical && (
-              <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase tracking-wider shrink-0">
-                {data.filing_type}
-              </span>
-            )}
+            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase tracking-wider shrink-0">
+              {data.filing_type}
+            </span>
             <div className="flex items-center gap-2 font-mono text-xs shrink-0">
               <span className="text-text-muted">{data.date_old}</span>
               <span className="text-accent">→</span>
@@ -829,6 +813,38 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 </button>
               );
             })}
+
+            {/* Filing type selector — right side of filter bar, Pro-gated */}
+            {!isHistorical && (
+              <div className="ml-auto flex items-center border-l border-bg-border px-3 gap-1 shrink-0">
+                <button
+                  onClick={() => switchFilingType("10-K")}
+                  className={`font-mono text-[10px] px-2.5 py-1 rounded border uppercase tracking-wider transition-colors duration-150 ${
+                    filingType === "10-K"
+                      ? "border-accent text-accent bg-accent/10"
+                      : "border-transparent text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  10-K
+                </button>
+                <button
+                  onClick={() => switchFilingType("10-Q")}
+                  title={plan === "free" ? "10-Q diffs require Pro" : undefined}
+                  className={`font-mono text-[10px] px-2.5 py-1 rounded border uppercase tracking-wider transition-colors duration-150 flex items-center gap-1 ${
+                    filingType === "10-Q"
+                      ? "border-accent text-accent bg-accent/10"
+                      : plan === "free"
+                        ? "border-transparent text-text-muted/50 cursor-pointer hover:text-accent hover:border-accent/40"
+                        : "border-transparent text-text-muted hover:text-text-secondary"
+                  }`}
+                >
+                  10-Q
+                  {plan === "free" && (
+                    <span className="text-[8px] font-bold text-accent/70 uppercase tracking-wider leading-none">Pro</span>
+                  )}
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Two-panel layout — responsive */}
