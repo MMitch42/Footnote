@@ -11,6 +11,8 @@ const TOP_TICKERS = [
   "META", "TSLA", "LLY",  "AVGO", "WMT",
   "JPM",  "ORCL", "XOM",  "NFLX", "COST",
   "AMD",  "UNH",  "PG",   "V",    "JNJ",
+  "BAC",  "MA",   "ABBV", "KO",   "MRK",
+  "CVX",  "CSCO", "CRM",  "ACN",  "TMO",
 ];
 
 export async function GET(req: Request) {

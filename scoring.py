@@ -36,13 +36,19 @@ Respond with JSON only:
 {{"score": <int>, "direction": "<escalating|reassuring|neutral>", "explanation": "<one sentence>"}}"""
 
 
-def score_passage(old_text: str, new_text: str, max_retries: int = 4) -> dict:
+def score_passage(old_text: str, new_text: str, max_retries: int = 2) -> dict:
+    """
+    Score one passage. Retries up to max_retries times on transient Gemini errors.
+    Delays are intentionally short (0.5s, 1.5s) — sequential scoring means long
+    delays per passage multiply badly across a full filing.
+    """
     prompt = PROMPT_TEMPLATE.format(
         old=old_text[:3000] if old_text else "(no prior text — entirely new disclosure)",
         new=new_text[:3000],
     )
     last_error: Exception = RuntimeError("no attempts made")
-    for attempt in range(max_retries):
+    delays = [0.5, 1.5]  # wait before attempt 2, 3 respectively
+    for attempt in range(max_retries + 1):
         try:
             response = _client.models.generate_content(
                 model="gemini-2.5-flash",
@@ -54,10 +60,10 @@ def score_passage(old_text: str, new_text: str, max_retries: int = 4) -> dict:
             return json.loads(response.text)
         except Exception as e:
             last_error = e
-            if attempt < max_retries - 1:
-                wait = (2 ** attempt) + random.uniform(0, 1)
+            if attempt < max_retries:
+                wait = delays[attempt] + random.uniform(0, 0.5)
                 print(
-                    f"  [scoring] attempt {attempt + 1}/{max_retries} failed, "
+                    f"  [scoring] attempt {attempt + 1}/{max_retries + 1} failed, "
                     f"retrying in {wait:.1f}s: {e}",
                     flush=True,
                 )

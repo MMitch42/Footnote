@@ -533,6 +533,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
   const [data, setData] = useState<DiffResult | null>(null);
   const [loading, setLoading] = useState(true);
+  const [slowLoad, setSlowLoad] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<SectionFilter>("all");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
@@ -550,17 +551,31 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   useEffect(() => {
     setData(null);
     setLoading(true);
+    setSlowLoad(false);
     setError(null);
     setSelectedIdx(null);
     setMobileView("overview");
 
+    // After 25s, surface a "still working" message so users don't bail
+    const slowTimer = setTimeout(() => setSlowLoad(true), 25_000);
+
     const url = isHistorical
       ? `${API_URL}/diff/${ticker}?date_new=${dateNew}&date_old=${dateOld}`
       : `${API_URL}/alert/${ticker}?form=${filingType}`;
-    fetch(url)
+
+    fetch(url, { signal: AbortSignal.timeout(120_000) })
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false); })
-      .catch((e) => { setError(e.message); setLoading(false); });
+      .then((d) => { clearTimeout(slowTimer); setData(d); setLoading(false); })
+      .catch((e) => {
+        clearTimeout(slowTimer);
+        const msg = e?.name === "TimeoutError"
+          ? "Analysis timed out. The filing may be unusually large — try again in a moment."
+          : e.message;
+        setError(msg);
+        setLoading(false);
+      });
+
+    return () => clearTimeout(slowTimer);
   }, [ticker, dateNew, dateOld, isHistorical, filingType]);
 
   // Check watchlist status + subscription
@@ -716,14 +731,20 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
       </nav>
 
       {loading && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3">
+        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
           <div className="flex gap-1">
             {[0, 1, 2].map((i) => (
               <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
             ))}
           </div>
           <p className="text-xs text-text-muted">Analyzing {ticker.toUpperCase()}…</p>
-          <p className="text-xs text-text-muted">First lookup ~30s · subsequent loads instant</p>
+          {slowLoad ? (
+            <p className="text-xs text-text-muted max-w-xs leading-relaxed">
+              Still working — large filings with many changes can take up to a minute on first analysis. Subsequent loads are instant.
+            </p>
+          ) : (
+            <p className="text-xs text-text-muted">First lookup ~20s · subsequent loads instant</p>
+          )}
         </div>
       )}
 
