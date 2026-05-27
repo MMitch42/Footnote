@@ -38,9 +38,13 @@ export async function GET(req: Request) {
   for (const ticker of TOP_TICKERS) {
     try {
       const res = await fetch(`${apiUrl}/alert/${ticker}?form=10-K`, {
-        signal: AbortSignal.timeout(45_000), // 45s per ticker
+        signal: AbortSignal.timeout(60_000), // 60s per ticker
       });
-      results[ticker] = res.ok ? "ok" : `http ${res.status}`;
+      const ok = res.ok;
+      const status = res.status;
+      // Always drain/cancel the body — unread streams accumulate and OOM the function
+      try { await res.body?.cancel(); } catch { /* ignore */ }
+      results[ticker] = ok ? "ok" : `http ${status}`;
     } catch (e) {
       results[ticker] = e instanceof Error ? e.message : "error";
     }

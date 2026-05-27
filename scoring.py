@@ -2,6 +2,7 @@ import os
 import json
 import time
 import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -38,16 +39,16 @@ Respond with JSON only:
 
 def score_passage(old_text: str, new_text: str, max_retries: int = 2) -> dict:
     """
-    Score one passage. Retries up to max_retries times on transient Gemini errors.
-    Delays are intentionally short (0.5s, 1.5s) — sequential scoring means long
-    delays per passage multiply badly across a full filing.
+    Score one passage with short retry backoff on transient Gemini errors.
+    Delays are kept tight (0.5s, 1.5s) — sequential or parallel scoring means
+    long per-passage delays multiply badly across a full filing.
     """
     prompt = PROMPT_TEMPLATE.format(
         old=old_text[:3000] if old_text else "(no prior text — entirely new disclosure)",
         new=new_text[:3000],
     )
     last_error: Exception = RuntimeError("no attempts made")
-    delays = [0.5, 1.5]  # wait before attempt 2, 3 respectively
+    delays = [0.5, 1.5]
     for attempt in range(max_retries + 1):
         try:
             response = _client.models.generate_content(
@@ -72,18 +73,29 @@ def score_passage(old_text: str, new_text: str, max_retries: int = 2) -> dict:
 
 
 def score_all(changed_passages: list[dict], max_passages: int = 30) -> list[dict]:
-    """Score each passage and attach score/direction/explanation to it."""
+    """
+    Score passages in parallel (5 workers) so a 30-passage filing takes ~6s
+    instead of ~90s sequential. Results are returned in original order.
+    """
     if len(changed_passages) > max_passages:
         print(f"  [scoring] capping at {max_passages} passages (found {len(changed_passages)})")
         changed_passages = changed_passages[:max_passages]
 
-    scored = []
     total = len(changed_passages)
-    for i, passage in enumerate(changed_passages, 1):
-        print(f"  [scoring] {i}/{total}...", flush=True)
+    scored: list[dict | None] = [None] * total
+
+    def _score_one(idx: int, passage: dict) -> tuple[int, dict]:
         try:
             result = score_passage(passage.get("old", ""), passage.get("new", ""))
-            scored.append({**passage, **result})
+            return idx, {**passage, **result}
         except Exception as e:
-            scored.append({**passage, "score": None, "direction": None, "explanation": f"scoring error: {e}"})
-    return scored
+            return idx, {**passage, "score": None, "direction": None, "explanation": f"scoring error: {e}"}
+
+    with ThreadPoolExecutor(max_workers=5) as pool:
+        futures = {pool.submit(_score_one, i, p): i for i, p in enumerate(changed_passages)}
+        for done_count, future in enumerate(as_completed(futures), 1):
+            idx, result = future.result()
+            scored[idx] = result
+            print(f"  [scoring] {done_count}/{total} done", flush=True)
+
+    return [p for p in scored if p is not None]
