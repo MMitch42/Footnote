@@ -72,6 +72,11 @@ export async function GET(req: Request) {
       const diff = diffs[entry.ticker];
       if (!diff || diff.error) continue;
 
+      // Skip stale filings — only alert on filings from the last 10 days.
+      // This prevents historical backfill diffs from triggering alerts.
+      const filingAge = (Date.now() - new Date(diff.date_new).getTime()) / (1000 * 60 * 60 * 24);
+      if (filingAge > 10) continue;
+
       // Already alerted for this filing?
       const { data: existing } = await sb
         .from("alerts_log")

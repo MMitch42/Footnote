@@ -3,7 +3,24 @@ import { ImageResponse } from "next/og";
 export const size = { width: 32, height: 32 };
 export const contentType = "image/png";
 
-export default function Icon() {
+// Google Fonts v1 API (no modern UA) reliably serves TTF, which Satori supports.
+// woff2 is NOT supported by Satori/ImageResponse.
+async function loadCursiveFont(): Promise<ArrayBuffer | null> {
+  try {
+    const css = await fetch(
+      "https://fonts.googleapis.com/css?family=Dancing+Script:700"
+    ).then((r) => r.text());
+    const url = css.match(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/)?.[1];
+    if (!url) return null;
+    return fetch(url).then((r) => r.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+export default async function Icon() {
+  const fontData = await loadCursiveFont();
+
   return new ImageResponse(
     (
       <div
@@ -19,17 +36,21 @@ export default function Icon() {
         <span
           style={{
             color: "#f59e0b",
-            fontSize: 13,
-            fontWeight: 800,
-            fontFamily: "ui-monospace, monospace",
+            fontSize: 17,
+            fontWeight: 700,
+            fontFamily: fontData ? "'Dancing Script'" : "serif",
             lineHeight: 1,
-            letterSpacing: "-1px",
           }}
         >
-          FN
+          fn
         </span>
       </div>
     ),
-    { ...size }
+    {
+      ...size,
+      ...(fontData
+        ? { fonts: [{ name: "Dancing Script", data: fontData, weight: 700 }] }
+        : {}),
+    }
   );
 }

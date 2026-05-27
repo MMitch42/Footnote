@@ -89,7 +89,7 @@ export function ChatWidget() {
     <>
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-[60px] right-3 w-[calc(100vw-24px)] sm:bottom-[152px] sm:right-24 sm:w-[370px] max-h-[520px] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden">
+        <div className="fixed bottom-[92px] right-3 w-[calc(100vw-24px)] sm:bottom-[152px] sm:right-24 sm:w-[370px] max-h-[520px] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden">
 
           {/* Header */}
           <div className="shrink-0 px-4 py-2.5 border-b border-bg-border flex items-center justify-between bg-bg-raised">
@@ -222,7 +222,7 @@ export function ChatWidget() {
       {/* Toggle button */}
       <button
         onClick={() => setOpen((o) => !o)}
-        className="fixed bottom-24 right-24 sm:bottom-24 sm:right-24 bottom-4 right-3 w-8 h-8 sm:w-11 sm:h-11 bg-accent text-bg-base rounded-full shadow-lg hover:bg-accent-bright transition-all duration-150 z-50 flex items-center justify-center font-mono text-xs sm:text-base select-none opacity-70 sm:opacity-100"
+        className="fixed bottom-12 right-12 sm:bottom-24 sm:right-24 w-8 h-8 sm:w-11 sm:h-11 bg-accent text-bg-base rounded-full shadow-lg hover:bg-accent-bright transition-all duration-150 z-50 flex items-center justify-center font-mono text-xs sm:text-base select-none opacity-70 sm:opacity-100"
         title="Footnote AI"
         aria-label="Open Footnote AI assistant"
       >

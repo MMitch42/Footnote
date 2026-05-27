@@ -18,6 +18,13 @@ from scoring import score_all
 SECTIONS = ["item_1a", "item_7", "item_3"]
 
 
+def _should_cache(scored: list[dict]) -> bool:
+    """Don't cache if every passage failed scoring — next request will retry."""
+    if not scored:
+        return True
+    return any(p.get("score") is not None for p in scored)
+
+
 def alert_mode(ticker: str, form: str = "10-K", sections: list = None) -> dict:
     """
     Compare the two most recent filings for a ticker.
@@ -46,7 +53,11 @@ def alert_mode(ticker: str, form: str = "10-K", sections: list = None) -> dict:
         scored = score_all(scorable)
         diff["changed_passages"] = scored
 
-        db.upsert_diff(ticker, form, new_filing["filing_date"], old_filing["filing_date"], section, diff)
+        if _should_cache(scored):
+            db.upsert_diff(ticker, form, new_filing["filing_date"], old_filing["filing_date"], section, diff)
+        else:
+            print(f"  [pipeline] all passages failed scoring for {section}, skipping cache")
+
         results[section] = diff
 
     return {
@@ -85,7 +96,11 @@ def historical_mode(ticker: str, form: str = "10-K", n: int = 10) -> list[dict]:
             scored = score_all(scorable)
             diff["changed_passages"] = scored
 
-            db.upsert_diff(ticker, form, new_f["filing_date"], old_f["filing_date"], section, diff)
+            if _should_cache(scored):
+                db.upsert_diff(ticker, form, new_f["filing_date"], old_f["filing_date"], section, diff)
+            else:
+                print(f"  [pipeline] all passages failed scoring for {section}, skipping cache")
+
             pair_result["sections"][section] = diff
 
         results.append(pair_result)

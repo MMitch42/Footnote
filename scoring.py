@@ -1,5 +1,7 @@
 import os
 import json
+import time
+import random
 from google import genai
 from google.genai import types
 from dotenv import load_dotenv
@@ -34,19 +36,33 @@ Respond with JSON only:
 {{"score": <int>, "direction": "<escalating|reassuring|neutral>", "explanation": "<one sentence>"}}"""
 
 
-def score_passage(old_text: str, new_text: str) -> dict:
+def score_passage(old_text: str, new_text: str, max_retries: int = 4) -> dict:
     prompt = PROMPT_TEMPLATE.format(
         old=old_text[:3000] if old_text else "(no prior text — entirely new disclosure)",
         new=new_text[:3000],
     )
-    response = _client.models.generate_content(
-        model="gemini-2.5-flash",
-        contents=prompt,
-        config=types.GenerateContentConfig(
-            response_mime_type="application/json"
-        ),
-    )
-    return json.loads(response.text)
+    last_error: Exception = RuntimeError("no attempts made")
+    for attempt in range(max_retries):
+        try:
+            response = _client.models.generate_content(
+                model="gemini-2.5-flash",
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json"
+                ),
+            )
+            return json.loads(response.text)
+        except Exception as e:
+            last_error = e
+            if attempt < max_retries - 1:
+                wait = (2 ** attempt) + random.uniform(0, 1)
+                print(
+                    f"  [scoring] attempt {attempt + 1}/{max_retries} failed, "
+                    f"retrying in {wait:.1f}s: {e}",
+                    flush=True,
+                )
+                time.sleep(wait)
+    raise last_error
 
 
 def score_all(changed_passages: list[dict], max_passages: int = 30) -> list[dict]:
