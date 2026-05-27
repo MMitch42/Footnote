@@ -14,11 +14,19 @@ export default function Icon() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: 8,
         }}
       >
-        <span style={{ color: "#f59e0b", fontSize: 13, fontWeight: 700, letterSpacing: "-0.5px", lineHeight: 1, fontFamily: "monospace" }}>
-          FN
+        <span
+          style={{
+            color: "#f59e0b",
+            fontSize: 18,
+            fontWeight: 700,
+            fontFamily: "ui-monospace, monospace",
+            lineHeight: 1,
+            letterSpacing: "-1px",
+          }}
+        >
+          F
         </span>
       </div>
     ),
