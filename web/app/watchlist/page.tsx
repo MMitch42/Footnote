@@ -159,7 +159,9 @@ function WatchlistContent() {
         <div className="border-b border-diff-add-border bg-diff-add/20 px-6 py-3 flex items-center gap-3">
           <div className="w-1.5 h-1.5 rounded-full bg-diff-add-text shrink-0" />
           <p className="text-sm text-diff-add-text">
-            You&apos;re on Pro. Add your first ticker below and we&apos;ll alert you when something changes.
+            {plan === "research"
+              ? "You're on Research. Add tickers to get alerts, then explore full filing history for each one."
+              : "You're on Pro. Add your first ticker below and we'll alert you when something changes."}
           </p>
         </div>
       )}
@@ -249,7 +251,7 @@ function WatchlistContent() {
           ) : items.length === 0 ? (
             <div className="rounded-xl border border-bg-border px-6 py-10 text-center">
               <p className="text-sm text-text-muted mb-1">No tickers yet.</p>
-              <p className="text-xs text-text-muted/60">Add a ticker above to start tracking filing changes.</p>
+              <p className="text-xs text-text-muted">Add a ticker above to start tracking filing changes.</p>
             </div>
           ) : (
             <div className="rounded-xl border border-bg-border divide-y divide-bg-border overflow-hidden">
@@ -279,18 +281,28 @@ function WatchlistContent() {
                     <option value={9}>Alert: Critical (9+)</option>
                   </select>
 
-                  {/* View diff link */}
-                  <Link
-                    href={`/diff/${item.ticker}`}
-                    className="text-xs text-text-muted hover:text-text-secondary transition-colors whitespace-nowrap ml-auto"
-                  >
-                    View latest →
-                  </Link>
+                  {/* Links */}
+                  <div className="flex items-center gap-3 ml-auto">
+                    {plan === "research" && (
+                      <Link
+                        href={`/history/${item.ticker}`}
+                        className="text-xs text-accent hover:text-accent-bright transition-colors whitespace-nowrap"
+                      >
+                        History
+                      </Link>
+                    )}
+                    <Link
+                      href={`/diff/${item.ticker}`}
+                      className="text-xs text-text-muted hover:text-text-secondary transition-colors whitespace-nowrap"
+                    >
+                      Latest →
+                    </Link>
+                  </div>
 
                   {/* Remove */}
                   <button
                     onClick={() => handleRemove(item.ticker)}
-                    className="text-xs text-text-muted/50 hover:text-diff-rem-text transition-colors shrink-0"
+                    className="text-xs text-text-muted hover:text-diff-rem-text transition-colors shrink-0"
                     title="Remove"
                   >
                     ✕
@@ -303,7 +315,7 @@ function WatchlistContent() {
 
         {/* Info */}
         {items.length > 0 && (
-          <p className="text-xs text-text-muted/60 leading-relaxed">
+          <p className="text-xs text-text-muted leading-relaxed">
             You&apos;ll be emailed when a new 10-K or 10-Q is filed and contains a change at or above your alert threshold.
           </p>
         )}

@@ -53,7 +53,20 @@ function TimelineChart({
   const [hovered, setHovered] = useState<number | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  if (data.length < 2) return null;
+  // Single point — render a minimal dot chart with a message
+  if (data.length === 1) {
+    const d = data[0];
+    return (
+      <div className="flex items-center gap-4 py-4">
+        <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${
+          d.max_score >= 9 ? "bg-[#f87171]" : d.max_score >= 7 ? "bg-accent" : "bg-[#d97706]"
+        }`} />
+        <p className="text-xs text-text-muted">
+          One filing pair on record ({d.date_old} → {d.date_new}, score {d.max_score}/10). Load full history below to populate the timeline.
+        </p>
+      </div>
+    );
+  }
 
   const W = 600;
   const H = 160;
@@ -315,7 +328,7 @@ export default function HistoryPage({ params }: { params: Promise<{ ticker: stri
         <div className="flex items-center justify-between">
           <div>
             <h1 className="font-mono text-lg font-bold text-text-primary tracking-wide">
-              {ticker} Filing History
+              {ticker.toUpperCase()} Filing History
             </h1>
             <p className="text-xs text-text-muted mt-1">
               Novelty score over time. Click any point to view that diff.
@@ -387,7 +400,27 @@ export default function HistoryPage({ params }: { params: Promise<{ ticker: stri
               />
             </div>
 
-            {/* Load more */}
+            {/* Load more banner when history looks incomplete */}
+            {timeline.length < 5 && !isBackfilling && (
+              <div className="rounded-xl border border-accent/30 bg-accent/5 px-5 py-4 flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold text-text-primary">
+                    Only {timeline.length} filing pair{timeline.length !== 1 ? "s" : ""} loaded
+                  </p>
+                  <p className="text-xs text-text-muted mt-0.5">
+                    Load the full history to see {ticker.toUpperCase()}&apos;s complete timeline. Up to 10+ years of consecutive diffs.
+                  </p>
+                </div>
+                <button
+                  onClick={triggerBackfill}
+                  className="shrink-0 text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap"
+                >
+                  Load full history →
+                </button>
+              </div>
+            )}
+
+            {/* Status row */}
             <div className="flex items-center justify-between">
               <p className="text-xs text-text-muted">
                 {timeline.length} filing pair{timeline.length !== 1 ? "s" : ""}
@@ -397,14 +430,14 @@ export default function HistoryPage({ params }: { params: Promise<{ ticker: stri
                   {[0, 1, 2].map((i) => (
                     <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                   ))}
-                  <span className="text-xs text-text-muted">Refreshing…</span>
+                  <span className="text-xs text-text-muted">Fetching and scoring filings…</span>
                 </div>
-              ) : (
+              ) : timeline.length >= 5 && (
                 <button
                   onClick={triggerBackfill}
                   className="text-xs text-text-muted hover:text-text-secondary transition-colors"
                 >
-                  Refresh history
+                  Refresh
                 </button>
               )}
             </div>

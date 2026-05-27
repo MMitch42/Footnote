@@ -28,13 +28,16 @@ export async function GET(req: Request) {
     }
   }
 
+  const { searchParams: grantParams } = new URL(req.url);
+  const tier = grantParams.get("tier") === "research" ? "research" : "pro";
+
   const sb = createServerClient();
   const { error } = await sb.from("subscriptions").upsert(
     {
       user_id: userId,
       stripe_customer_id: "owner_manual",
       stripe_subscription_id: "owner_manual",
-      plan: "pro",
+      plan: tier,
     },
     { onConflict: "user_id" }
   );

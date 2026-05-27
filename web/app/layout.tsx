@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ChatWidget } from "@/components/ChatWidget";
+import { FeatureLauncher } from "@/components/FeatureLauncher";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -53,6 +54,7 @@ export default function RootLayout({
       >
         <body className="min-h-full flex flex-col bg-bg-base text-text-primary antialiased">
           {children}
+          <FeatureLauncher />
           <ChatWidget />
         </body>
       </html>

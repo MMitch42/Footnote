@@ -53,7 +53,7 @@ function scoreCfg(score: number | null) {
 
 function ScoreBadge({ score }: { score: number | null }) {
   const cfg = scoreCfg(score);
-  if (!cfg || !score) return <span className="font-mono text-xs text-text-muted/30">?</span>;
+  if (!cfg || !score) return <span className="font-mono text-xs text-text-muted">?</span>;
   return (
     <div className="flex items-center gap-1.5 shrink-0">
       <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${cfg.dot}`} />
@@ -219,7 +219,7 @@ function BriefingPanel({
         </div>
       </div>
 
-      <p className="text-xs text-text-muted/60">
+      <p className="text-xs text-text-muted">
         Click a finding above or use ↑ ↓ to browse · Esc returns here
       </p>
     </div>
@@ -485,7 +485,7 @@ export default function DiffPage({ params }: { params: Promise<{ ticker: string 
             ))}
           </div>
           <p className="text-xs text-text-muted">Analyzing {ticker}…</p>
-          <p className="text-xs text-text-muted/60">First lookup ~30s · subsequent loads instant</p>
+          <p className="text-xs text-text-muted">First lookup ~30s · subsequent loads instant</p>
         </div>
       )}
 
