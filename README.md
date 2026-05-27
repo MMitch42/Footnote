@@ -198,9 +198,3 @@ CREATE TABLE user_preferences (
   updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 ```
-
----
-
-## License
-
-MIT
