@@ -19,33 +19,52 @@ export default function AppleIcon() {
           gap: 0,
         }}
       >
-        {/* F — large, orange */}
-        <span
+        {/* FN monogram */}
+        <div
           style={{
-            color: "#f59e0b",
-            fontSize: 96,
-            fontWeight: 700,
-            fontFamily: "ui-monospace, monospace",
-            lineHeight: 1,
-            letterSpacing: "-4px",
+            display: "flex",
+            alignItems: "baseline",
+            gap: 0,
           }}
         >
-          F
-        </span>
-        {/* footnote dot — ties to the brand concept */}
-        <span
+          <span
+            style={{
+              color: "#f59e0b",
+              fontSize: 88,
+              fontWeight: 800,
+              fontFamily: "ui-monospace, monospace",
+              lineHeight: 1,
+              letterSpacing: "-5px",
+            }}
+          >
+            FN
+          </span>
+          {/* Superscript footnote marker — ties to the brand concept */}
+          <span
+            style={{
+              color: "#f59e0b",
+              fontSize: 28,
+              fontWeight: 700,
+              fontFamily: "ui-monospace, monospace",
+              lineHeight: 1,
+              opacity: 0.7,
+              marginBottom: 28,
+              marginLeft: 2,
+            }}
+          >
+            ¹
+          </span>
+        </div>
+        {/* Thin rule — the footnote underline */}
+        <div
           style={{
-            color: "#f59e0b",
-            fontSize: 18,
-            fontWeight: 700,
-            fontFamily: "ui-monospace, monospace",
-            letterSpacing: "6px",
-            opacity: 0.6,
-            marginTop: 2,
+            width: 64,
+            height: 2,
+            background: "#f59e0b",
+            opacity: 0.35,
+            marginTop: 8,
           }}
-        >
-          NOTE
-        </span>
+        />
       </div>
     ),
     { width: 180, height: 180 }

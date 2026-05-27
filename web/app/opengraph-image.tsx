@@ -54,16 +54,51 @@ export default function Image() {
           {/* Brand */}
           <div
             style={{
-              fontSize: 20,
-              color: "#f59e0b",
-              letterSpacing: "0.3em",
-              fontWeight: 700,
-              textTransform: "uppercase",
-              marginBottom: 32,
               display: "flex",
+              alignItems: "baseline",
+              gap: 0,
+              marginBottom: 32,
             }}
           >
-            FOOTNOTE
+            <span
+              style={{
+                fontSize: 28,
+                color: "#f59e0b",
+                fontWeight: 800,
+                letterSpacing: "-1px",
+                fontFamily: "ui-monospace, monospace",
+                display: "flex",
+              }}
+            >
+              FN
+            </span>
+            <span
+              style={{
+                fontSize: 14,
+                color: "#f59e0b",
+                fontWeight: 700,
+                opacity: 0.7,
+                marginBottom: 10,
+                marginLeft: 1,
+                display: "flex",
+              }}
+            >
+              ¹
+            </span>
+            <span
+              style={{
+                fontSize: 14,
+                color: "#888",
+                letterSpacing: "0.25em",
+                fontWeight: 500,
+                marginLeft: 12,
+                alignSelf: "flex-end",
+                marginBottom: 3,
+                display: "flex",
+              }}
+            >
+              FOOTNOTE
+            </span>
           </div>
 
           {/* Headline */}

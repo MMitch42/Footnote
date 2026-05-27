@@ -69,15 +69,50 @@ export default async function Image({
           {/* Brand */}
           <div
             style={{
-              fontSize: 18,
-              color: "#555",
-              letterSpacing: "0.3em",
-              textTransform: "uppercase",
-              marginBottom: 40,
               display: "flex",
+              alignItems: "baseline",
+              gap: 0,
+              marginBottom: 40,
             }}
           >
-            FOOTNOTE
+            <span
+              style={{
+                fontSize: 22,
+                color: "#f59e0b",
+                fontWeight: 800,
+                letterSpacing: "-1px",
+                fontFamily: "ui-monospace, monospace",
+                display: "flex",
+              }}
+            >
+              FN
+            </span>
+            <span
+              style={{
+                fontSize: 12,
+                color: "#f59e0b",
+                fontWeight: 700,
+                opacity: 0.7,
+                marginBottom: 8,
+                marginLeft: 1,
+                display: "flex",
+              }}
+            >
+              ¹
+            </span>
+            <span
+              style={{
+                fontSize: 14,
+                color: "#444",
+                letterSpacing: "0.25em",
+                marginLeft: 10,
+                alignSelf: "flex-end",
+                marginBottom: 2,
+                display: "flex",
+              }}
+            >
+              FOOTNOTE
+            </span>
           </div>
 
           {/* Ticker — big */}

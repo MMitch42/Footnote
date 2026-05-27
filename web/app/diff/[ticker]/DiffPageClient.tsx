@@ -153,7 +153,7 @@ function BriefingPanel({
     verdict === "REASSURING" ? "text-diff-add-text" : "text-text-secondary";
 
   return (
-    <div className="p-6 space-y-8 max-w-2xl">
+    <div className="p-4 sm:p-6 space-y-8 max-w-2xl">
       {/* Header */}
       <div>
         <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1">
@@ -166,16 +166,22 @@ function BriefingPanel({
 
       {/* Stats */}
       <div className="grid grid-cols-3 rounded-lg border border-bg-border divide-x divide-bg-border overflow-hidden">
-        <div className="px-4 py-3">
+        <div className="px-3 sm:px-4 py-3">
           <p className="font-mono text-xl font-bold text-text-primary">{passages.length}</p>
           <p className="text-[11px] text-text-secondary mt-0.5">Changes</p>
         </div>
-        <div className="px-4 py-3">
+        <div className="px-3 sm:px-4 py-3">
           <p className="font-mono text-xl font-bold text-accent">{highPassages.length}</p>
           <p className="text-[11px] text-text-secondary mt-0.5">High-novelty</p>
         </div>
-        <div className="px-4 py-3">
-          <p className={`font-mono text-xl font-bold ${verdictColor}`}>{verdict}</p>
+        <div className="px-3 sm:px-4 py-3">
+          {/* Full word on sm+; arrow + abbreviated word on mobile */}
+          <p className={`font-mono font-bold leading-tight ${verdictColor}`}>
+            <span className="hidden sm:block text-xl">{verdict}</span>
+            <span className="sm:hidden text-sm">
+              {verdict === "ESCALATING" ? "↑ ESC" : verdict === "REASSURING" ? "↓ REA" : "MIX"}
+            </span>
+          </p>
           <p className="text-[11px] text-text-secondary mt-0.5">Direction</p>
         </div>
       </div>
@@ -429,14 +435,14 @@ function PassageDetail({
       </div>
 
       {/* Explanation + score */}
-      <div className="px-6 py-5 border-b border-bg-border bg-bg-surface flex items-start justify-between gap-6">
-        <p className="text-sm text-text-secondary leading-relaxed flex-1">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-bg-border bg-bg-surface flex items-start justify-between gap-4">
+        <p className="text-sm text-text-secondary leading-relaxed flex-1 min-w-0">
           {passage.explanation ?? "Language change detected."}
         </p>
         <div className="shrink-0 flex flex-col items-end gap-1.5">
           <ScoreBadge score={passage.score} />
           {passage.section && (
-            <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
+            <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider text-right">
               {SECTION_FULL[passage.section] ?? passage.section}
             </span>
           )}
@@ -458,8 +464,8 @@ function PassageDetail({
               </span>
             </div>
           </div>
-          <div className="px-6 py-5">
-            <p className="font-mono text-sm leading-relaxed text-text-primary">
+          <div className="px-4 sm:px-6 py-4 sm:py-5">
+            <p className="font-mono text-sm leading-relaxed text-text-primary break-words">
               {wordDiffOps.map((op, idx) => {
                 const sp = idx > 0 ? " " : "";
                 if (op.type === "keep") return <span key={idx}>{sp}{op.text}</span>;
@@ -488,21 +494,21 @@ function PassageDetail({
         <>
           {passage.old && (
             <div className="border-b border-bg-border">
-              <div className="px-6 py-2 bg-diff-rem border-b border-bg-border/50">
+              <div className="px-4 sm:px-6 py-2 bg-diff-rem border-b border-bg-border/50">
                 <span className="text-xs font-medium text-diff-rem-text/70 uppercase tracking-wide">Removed</span>
               </div>
-              <div className="px-6 py-5 bg-diff-rem/30">
-                <p className="font-mono text-sm text-diff-rem-text leading-relaxed">{passage.old}</p>
+              <div className="px-4 sm:px-6 py-4 sm:py-5 bg-diff-rem/30">
+                <p className="font-mono text-sm text-diff-rem-text leading-relaxed break-words">{passage.old}</p>
               </div>
             </div>
           )}
           {passage.new && (
             <div>
-              <div className="px-6 py-2 bg-diff-add border-b border-bg-border/50">
+              <div className="px-4 sm:px-6 py-2 bg-diff-add border-b border-bg-border/50">
                 <span className="text-xs font-medium text-diff-add-text/70 uppercase tracking-wide">Added</span>
               </div>
-              <div className="px-6 py-5 bg-diff-add/30">
-                <p className="font-mono text-sm text-diff-add-text leading-relaxed">{passage.new}</p>
+              <div className="px-4 sm:px-6 py-4 sm:py-5 bg-diff-add/30">
+                <p className="font-mono text-sm text-diff-add-text leading-relaxed break-words">{passage.new}</p>
               </div>
             </div>
           )}

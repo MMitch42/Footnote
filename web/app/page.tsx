@@ -386,26 +386,31 @@ export default function Home() {
                     <button
                       key={i}
                       onClick={() => router.push(`/diff/${entry.ticker}`)}
-                      className="w-full text-left px-4 py-3 flex items-center gap-4 hover:bg-bg-raised transition-colors duration-100 group"
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group"
                     >
                       {/* Score dot */}
                       <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
 
                       {/* Ticker + type */}
-                      <div className="flex items-center gap-2 w-28 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         <span className="font-mono text-sm font-bold text-text-primary">{entry.ticker}</span>
                         <span className="font-mono text-[10px] px-1 py-0.5 rounded border border-bg-border text-text-muted uppercase">{entry.filing_type}</span>
                       </div>
 
-                      {/* Score */}
-                      <div className="flex items-center gap-1.5 w-28 shrink-0">
+                      {/* Score — label hidden on small screens */}
+                      <div className="flex items-center gap-1.5 shrink-0">
                         <span className={`font-mono text-sm font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
-                        <span className={`text-xs ${scoreColor}`}>{scoreLabel}</span>
+                        <span className={`text-xs hidden sm:inline ${scoreColor}`}>{scoreLabel}</span>
                       </div>
 
-                      {/* Direction */}
-                      <span className={`text-xs w-24 shrink-0 ${dirColor || "text-text-muted"}`}>
-                        {dirLabel ?? "Neutral"}
+                      {/* Direction — abbreviated on mobile */}
+                      <span className={`text-xs shrink-0 ${dirColor || "text-text-muted"}`}>
+                        <span className="sm:hidden">
+                          {entry.direction === "escalating" ? "↑" : entry.direction === "reassuring" ? "↓" : "—"}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {dirLabel ?? "Neutral"}
+                        </span>
                       </span>
 
                       {/* Date range */}
