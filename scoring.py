@@ -34,7 +34,7 @@ Also assess direction:
 - "neutral" = changed but direction is ambiguous
 
 Respond with JSON only:
-{{"score": <int>, "direction": "<escalating|reassuring|neutral>", "explanation": "<one sentence>"}}"""
+{{"score": <int>, "direction": "<escalating|reassuring|neutral>", "explanation": "<10-15 words max. Name the specific thing that changed, not that something changed. Active voice. No hedging. Examples: 'Named AWS custom silicon as direct competitive threat for first time' / 'Removed specific $2.3B settlement figure from litigation disclosure' / 'Added TSMC single-source dependency as new supply chain risk'>"}}"""
 
 
 def score_passage(old_text: str, new_text: str, max_retries: int = 2) -> dict:

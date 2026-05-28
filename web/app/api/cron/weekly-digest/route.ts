@@ -19,6 +19,21 @@ type DiffRow = {
   changed_passages: Passage[] | null;
 };
 
+type SynthesisItem = { headline: string; detail?: string };
+
+type Synthesis = {
+  executive_summary?: string;
+  concerns?: SynthesisItem[];
+  reassurances?: SynthesisItem[];
+};
+
+type SynthesisRow = {
+  ticker: string;
+  filing_date_new: string;
+  filing_date_old: string;
+  changed_passages: Synthesis | null;
+};
+
 type TickerSummary = {
   ticker: string;
   filing_type: string;
@@ -29,6 +44,7 @@ type TickerSummary = {
   highCount: number;
   direction: "escalating" | "reassuring" | "neutral";
   topExplanation: string | null;
+  synthesis?: Synthesis | null;
 };
 
 function authorize(req: Request): boolean {
@@ -80,19 +96,37 @@ export async function GET(req: Request) {
     return Response.json({ ok: true, sent: 0, reason: "no pro users with watchlists" });
   }
 
-  // 4. Fetch recent diffs for all watched tickers (past 30 days — captures monthly filers)
+  // 4. Fetch recent diffs for all watched tickers (past 7 days — weekly digest)
   const uniqueTickers = [...new Set(Object.values(watchlistByUser).flat())];
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
+  const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
-  const { data: recentDiffs } = await sb
-    .from("diffs")
-    .select("ticker, filing_type, filing_date_new, filing_date_old, changed_passages")
-    .in("ticker", uniqueTickers)
-    .gte("filing_date_new", cutoff)
-    .order("filing_date_new", { ascending: false });
+  const [{ data: recentDiffs }, { data: synthesisDiffs }] = await Promise.all([
+    sb
+      .from("diffs")
+      .select("ticker, filing_type, filing_date_new, filing_date_old, changed_passages")
+      .in("ticker", uniqueTickers)
+      .gte("filing_date_new", cutoff)
+      .neq("section", "synthesis")
+      .order("filing_date_new", { ascending: false }),
+    sb
+      .from("diffs")
+      .select("ticker, filing_date_new, filing_date_old, changed_passages")
+      .in("ticker", uniqueTickers)
+      .gte("filing_date_new", cutoff)
+      .eq("section", "synthesis"),
+  ]);
 
   if (!recentDiffs?.length) {
-    return Response.json({ ok: true, sent: 0, reason: "no recent diffs in past 30 days" });
+    return Response.json({ ok: true, sent: 0, reason: "no recent diffs in past 7 days" });
+  }
+
+  // Build synthesis lookup: "TICKER||date_new||date_old" → synthesis object
+  const synthesisMap: Record<string, Synthesis> = {};
+  for (const row of (synthesisDiffs ?? []) as SynthesisRow[]) {
+    if (row.changed_passages && !("_error" in row.changed_passages)) {
+      const key = `${row.ticker}||${row.filing_date_new}||${row.filing_date_old}`;
+      synthesisMap[key] = row.changed_passages;
+    }
   }
 
   // 5. Aggregate diffs into per-ticker summaries
@@ -120,6 +154,7 @@ export async function GET(req: Request) {
         highCount,
         direction,
         topExplanation: topPassage?.explanation ?? null,
+        synthesis: synthesisMap[key] ?? null,
       };
     } else {
       // Merge sections
@@ -152,8 +187,8 @@ export async function GET(req: Request) {
 
       const highCount = userSummaries.reduce((sum, s) => sum + s.highCount, 0);
       const subject = highCount > 0
-        ? `${highCount} high-novelty change${highCount !== 1 ? "s" : ""} across your watchlist this month`
-        : `${userSummaries.length} ticker${userSummaries.length !== 1 ? "s" : ""} had filing activity this month`;
+        ? `${highCount} high-novelty change${highCount !== 1 ? "s" : ""} across your watchlist this week`
+        : `${userSummaries.length} ticker${userSummaries.length !== 1 ? "s" : ""} had filing activity this week`;
 
       await resend.emails.send({
         from: "Footnote <onboarding@resend.dev>",
@@ -197,6 +232,27 @@ function buildDigestEmail({ summaries }: { summaries: TickerSummary[] }): string
       s.direction === "escalating" ? "#f87171" :
       s.direction === "reassuring"  ? "#34d399" : "#6b7280";
     const diffUrl = `${APP_URL}/diff/${s.ticker}`;
+    const syn = s.synthesis;
+
+    // Synthesis block: executive summary + top 2 concerns + top 2 reassurances
+    const synthesisBlock = syn ? (() => {
+      const summary = syn.executive_summary
+        ? `<p style="margin:8px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;">${syn.executive_summary}</p>`
+        : "";
+      const concerns = (syn.concerns?.length ?? 0) > 0
+        ? syn.concerns!.slice(0, 2).map((c) =>
+            `<p style="margin:4px 0 0;font-size:12px;color:#d1d5db;line-height:1.4;"><span style="color:#f87171;">↑</span> ${c.headline}</p>`
+          ).join("")
+        : "";
+      const reassurances = (syn.reassurances?.length ?? 0) > 0
+        ? syn.reassurances!.slice(0, 2).map((r) =>
+            `<p style="margin:4px 0 0;font-size:12px;color:#d1d5db;line-height:1.4;"><span style="color:#34d399;">↓</span> ${r.headline}</p>`
+          ).join("")
+        : "";
+      return summary + concerns + reassurances;
+    })() : (s.topExplanation
+        ? `<p style="margin:8px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;padding-left:10px;border-left:2px solid #1f1f1f;">${s.topExplanation}</p>`
+        : "");
 
     return `
       <tr>
@@ -234,11 +290,8 @@ function buildDigestEmail({ summaries }: { summaries: TickerSummary[] }): string
             </tr>
           </table>
 
-          <!-- Top finding -->
-          ${s.topExplanation ? `
-          <p style="margin:8px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;padding-left:10px;border-left:2px solid #1f1f1f;">
-            ${s.topExplanation}
-          </p>` : ""}
+          <!-- Synthesis / top finding -->
+          ${synthesisBlock}
 
           <!-- CTA -->
           <p style="margin:10px 0 0;">
@@ -251,7 +304,7 @@ function buildDigestEmail({ summaries }: { summaries: TickerSummary[] }): string
   }).join("");
 
   const now = new Date();
-  const monthYear = now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+  const weekEnd = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 
   return `<!DOCTYPE html>
 <html>
@@ -267,14 +320,14 @@ function buildDigestEmail({ summaries }: { summaries: TickerSummary[] }): string
             FOOTNOTE
           </p>
           <p style="margin:3px 0 0;font-family:monospace;font-size:11px;color:#4b5563;text-transform:uppercase;letter-spacing:0.1em;">
-            Monthly Digest · ${monthYear}
+            Weekly Digest · ${weekEnd}
           </p>
         </td></tr>
 
         <!-- Intro -->
         <tr><td style="padding-bottom:20px;">
           <p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6;">
-            Here&apos;s what changed across your watched tickers.
+            Here&apos;s what changed across your watched tickers this week.
             ${summaries.length} ticker${summaries.length !== 1 ? "s" : ""} had filing activity —
             ${summaries.filter(s => s.highCount > 0).length} with high-novelty changes.
           </p>
@@ -308,9 +361,12 @@ function buildDigestEmail({ summaries }: { summaries: TickerSummary[] }): string
 
         <!-- Footer -->
         <tr><td style="border-top:1px solid #1a1a1a;padding-top:18px;">
-          <p style="margin:0;font-size:11px;color:#374151;line-height:1.6;">
+          <p style="margin:0 0 6px;font-size:11px;color:#374151;line-height:1.6;">
             You&apos;re on the Pro plan. Manage your watchlist and alert thresholds at
             <a href="${APP_URL}/watchlist" style="color:#4b5563;">${APP_URL}/watchlist</a>.
+          </p>
+          <p style="margin:0;font-size:10px;color:#374151;">
+            Not financial advice. For informational purposes only.
           </p>
         </td></tr>
 

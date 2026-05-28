@@ -106,12 +106,57 @@ def get_filing(ticker: str, filing_type: str, filing_date: str):
     return result.data[0] if result.data else None
 
 
+def upsert_synthesis(ticker: str, filing_type: str, date_new: str, date_old: str, synthesis: dict):
+    """
+    Cache a synthesis report for a filing pair.
+    Stored in the diffs table as section='synthesis' to avoid schema changes.
+    The synthesis dict is stored in changed_passages (JSONB accepts any JSON).
+    """
+    client = get_client()
+    row = {
+        "ticker": ticker.upper(),
+        "filing_type": filing_type,
+        "filing_date_new": date_new,
+        "filing_date_old": date_old,
+        "section": "synthesis",
+        "changed_passages": synthesis,
+        "change_ratio": 0.0,
+    }
+    return (
+        client.table("diffs")
+        .upsert(row, on_conflict="ticker,filing_type,filing_date_new,filing_date_old,section")
+        .execute()
+    )
+
+
+def get_synthesis(ticker: str, filing_type: str, date_new: str, date_old: str) -> dict | None:
+    """Return cached synthesis report, or None if not yet computed."""
+    client = get_client()
+    result = (
+        client.table("diffs")
+        .select("changed_passages")
+        .eq("ticker", ticker.upper())
+        .eq("filing_type", filing_type)
+        .eq("filing_date_new", date_new)
+        .eq("filing_date_old", date_old)
+        .eq("section", "synthesis")
+        .execute()
+    )
+    if result.data:
+        data = result.data[0]["changed_passages"]
+        # Only return if it's a real result (not an error fallback with no content)
+        if isinstance(data, dict) and not data.get("_error"):
+            return data
+    return None
+
+
 def get_recent_diffs(limit: int = 48) -> list:
     """Return recent diff rows across all tickers for homepage feed."""
     client = get_client()
     result = (
         client.table("diffs")
         .select("ticker,filing_type,filing_date_new,filing_date_old,changed_passages,computed_at")
+        .neq("section", "synthesis")          # exclude synthesis meta-rows
         .order("filing_date_new", desc=True)
         .limit(limit)
         .execute()
@@ -127,6 +172,7 @@ def list_diffs_raw(ticker: str, filing_type: str) -> list:
         .select("filing_date_new,filing_date_old,section,changed_passages,change_ratio")
         .eq("ticker", ticker.upper())
         .eq("filing_type", filing_type)
+        .neq("section", "synthesis")          # exclude synthesis meta-rows
         .execute()
     )
     return result.data if result.data else []

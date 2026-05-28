@@ -16,12 +16,24 @@ type Passage = {
 
 type SectionDiff = { changed_passages: Passage[]; change_ratio: number };
 
+type SynthesisItem = { headline: string; detail?: string };
+
+type Synthesis = {
+  executive_summary?: string;
+  management_sentiment?: "very_cautious" | "cautious" | "neutral" | "confident" | "very_confident";
+  concerns?: SynthesisItem[];
+  reassurances?: SynthesisItem[];
+  performance_implications?: string;
+};
+
 type DiffResult = {
   ticker: string;
+  company_name?: string;
   filing_type: string;
   date_new: string;
   date_old: string;
   sections: Record<string, SectionDiff>;
+  synthesis?: Synthesis | null;
   error?: string;
 };
 
@@ -38,7 +50,14 @@ export async function GET(req: Request) {
 
   const sb = createServerClient();
 
-  // 1. Load all watchlist entries
+  // 1. Load all watchlist entries for Pro users only
+  const { data: proSubs } = await sb
+    .from("subscriptions")
+    .select("user_id")
+    .in("plan", ["pro", "research"]);
+
+  const proUserIds = new Set((proSubs ?? []).map((s: { user_id: string }) => s.user_id));
+
   const { data: entries, error: wErr } = await sb
     .from("watchlist")
     .select("user_id, ticker, threshold");
@@ -47,8 +66,16 @@ export async function GET(req: Request) {
     return Response.json({ ok: true, sent: 0, reason: wErr?.message ?? "empty watchlist" });
   }
 
+  // Filter to Pro users only — free users don't get email alerts
+  const proEntries = (entries as { user_id: string; ticker: string; threshold: number }[])
+    .filter((e) => proUserIds.has(e.user_id));
+
+  if (proEntries.length === 0) {
+    return Response.json({ ok: true, sent: 0, reason: "no pro watchlist entries" });
+  }
+
   // 2. Fetch diffs for each unique ticker (deduplicated)
-  const uniqueTickers = [...new Set(entries.map((e: { ticker: string }) => e.ticker))];
+  const uniqueTickers = [...new Set(proEntries.map((e) => e.ticker))];
   const diffs: Record<string, DiffResult | null> = {};
 
   await Promise.allSettled(
@@ -67,7 +94,7 @@ export async function GET(req: Request) {
   let sent = 0;
   const errors: string[] = [];
 
-  for (const entry of entries as { user_id: string; ticker: string; threshold: number }[]) {
+  for (const entry of proEntries) {
     try {
       const diff = diffs[entry.ticker];
       if (!diff || diff.error) continue;
@@ -108,7 +135,7 @@ export async function GET(req: Request) {
         // TODO: replace sender once your domain is verified in Resend
         from: "Footnote <onboarding@resend.dev>",
         to: email,
-        subject: `${entry.ticker} · ${diff.filing_type}: ${triggered.length} change${triggered.length !== 1 ? "s" : ""} above your threshold`,
+        subject: `${diff.company_name ?? diff.ticker} (${diff.ticker}) · ${diff.filing_type}: ${triggered.length} change${triggered.length !== 1 ? "s" : ""} above your threshold`,
         html: buildAlertEmail({ diff, passages: triggered, appUrl }),
       });
 
@@ -145,6 +172,22 @@ function scoreLabel(score: number | null) {
   return              { label: `${score}/10 Low`,         color: SCORE_COLOR.low };
 }
 
+const SENTIMENT_LABEL: Record<string, string> = {
+  very_cautious: "Very Cautious",
+  cautious: "Cautious",
+  neutral: "Neutral",
+  confident: "Confident",
+  very_confident: "Very Confident",
+};
+
+const SENTIMENT_COLOR: Record<string, string> = {
+  very_cautious: "#f87171",
+  cautious: "#d97706",
+  neutral: "#6b7280",
+  confident: "#34d399",
+  very_confident: "#10b981",
+};
+
 function buildAlertEmail({
   diff,
   passages,
@@ -156,7 +199,59 @@ function buildAlertEmail({
 }): string {
   const top = passages.slice(0, 5);
   const diffUrl = `${appUrl}/diff/${diff.ticker}`;
+  const companyDisplay = diff.company_name
+    ? `${diff.company_name} (${diff.ticker})`
+    : diff.ticker;
+  const syn = diff.synthesis;
 
+  // Synthesis section (concerns + reassurances)
+  const synthesisHtml = syn ? (() => {
+    const sentiment = syn.management_sentiment;
+    const sentimentHtml = sentiment ? `
+      <tr><td style="padding-bottom:8px;">
+        <span style="font-family:monospace;font-size:11px;font-weight:700;color:${SENTIMENT_COLOR[sentiment] ?? "#6b7280"};text-transform:uppercase;letter-spacing:0.08em;">
+          Management sentiment: ${SENTIMENT_LABEL[sentiment] ?? sentiment}
+        </span>
+      </td></tr>` : "";
+
+    const summaryHtml = syn.executive_summary ? `
+      <tr><td style="padding:12px 0 16px;border-bottom:1px solid #1f1f1f;">
+        <p style="margin:0;font-size:13px;color:#d1d5db;line-height:1.6;">${syn.executive_summary}</p>
+      </td></tr>` : "";
+
+    const concernsHtml = (syn.concerns?.length ?? 0) > 0 ? `
+      <tr><td style="padding-top:16px;padding-bottom:4px;">
+        <p style="margin:0 0 8px;font-family:monospace;font-size:10px;font-weight:700;color:#f87171;text-transform:uppercase;letter-spacing:0.1em;">Key concerns</p>
+        ${syn.concerns!.slice(0, 3).map((c) => `
+          <p style="margin:0 0 6px;font-size:13px;color:#d1d5db;line-height:1.5;">
+            <span style="color:#f87171;">↑</span> ${c.headline}
+          </p>`).join("")}
+      </td></tr>` : "";
+
+    const reassurancesHtml = (syn.reassurances?.length ?? 0) > 0 ? `
+      <tr><td style="padding-top:12px;padding-bottom:4px;border-top:1px solid #1f1f1f;">
+        <p style="margin:0 0 8px;font-family:monospace;font-size:10px;font-weight:700;color:#34d399;text-transform:uppercase;letter-spacing:0.1em;">Reassurances</p>
+        ${syn.reassurances!.slice(0, 3).map((r) => `
+          <p style="margin:0 0 6px;font-size:13px;color:#d1d5db;line-height:1.5;">
+            <span style="color:#34d399;">↓</span> ${r.headline}
+          </p>`).join("")}
+      </td></tr>` : "";
+
+    if (!summaryHtml && !concernsHtml && !reassurancesHtml) return "";
+
+    return `
+      <tr><td style="padding:20px;background:#111111;border:1px solid #1f1f1f;border-radius:8px;margin-bottom:24px;">
+        ${sentimentHtml}
+        <table width="100%" cellpadding="0" cellspacing="0">
+          ${summaryHtml}
+          ${concernsHtml}
+          ${reassurancesHtml}
+        </table>
+      </td></tr>
+      <tr><td style="height:24px;"></td></tr>`;
+  })() : "";
+
+  // Individual passage findings
   const findingsHtml = top.map((p) => {
     const { label, color } = scoreLabel(p.score);
     const dirIcon =
@@ -193,12 +288,15 @@ function buildAlertEmail({
           </p>
         </td></tr>
 
-        <!-- Ticker + filing info -->
-        <tr><td style="padding:20px;background:#111111;border:1px solid #1f1f1f;border-radius:8px;margin-bottom:24px;">
-          <p style="margin:0 0 2px;font-family:monospace;font-size:22px;font-weight:700;color:#f59e0b;">
+        <!-- Company + filing info -->
+        <tr><td style="padding:20px;background:#111111;border:1px solid #1f1f1f;border-radius:8px;">
+          <p style="margin:0 0 2px;font-size:20px;font-weight:700;color:#f0f0f0;">
+            ${diff.company_name ?? diff.ticker}
+          </p>
+          <p style="margin:0 0 12px;font-family:monospace;font-size:12px;color:#f59e0b;">
             ${diff.ticker}
           </p>
-          <p style="margin:0 0 12px;font-family:monospace;font-size:12px;color:#6b7280;">
+          <p style="margin:0 0 4px;font-family:monospace;font-size:12px;color:#6b7280;">
             ${diff.filing_type} &nbsp;·&nbsp; ${diff.date_old} → ${diff.date_new}
           </p>
           <p style="margin:0;font-size:13px;color:#9ca3af;">
@@ -209,7 +307,10 @@ function buildAlertEmail({
 
         <tr><td style="height:24px;"></td></tr>
 
-        <!-- Findings -->
+        <!-- Synthesis (if available) -->
+        ${synthesisHtml}
+
+        <!-- Top findings header -->
         <tr><td>
           <p style="margin:0 0 12px;font-family:monospace;font-size:10px;font-weight:700;color:#4b5563;text-transform:uppercase;letter-spacing:0.1em;">
             Top findings
@@ -233,11 +334,14 @@ function buildAlertEmail({
 
         <!-- Footer -->
         <tr><td style="border-top:1px solid #1f1f1f;padding-top:20px;">
-          <p style="margin:0;font-size:11px;color:#374151;line-height:1.6;">
-            You're receiving this because <strong style="color:#4b5563;">${diff.ticker}</strong>
+          <p style="margin:0 0 6px;font-size:11px;color:#374151;line-height:1.6;">
+            You're receiving this because <strong style="color:#4b5563;">${companyDisplay}</strong>
             is on your Footnote watchlist.
             Manage your watchlist at
             <a href="${appUrl}/watchlist" style="color:#4b5563;">${appUrl}/watchlist</a>.
+          </p>
+          <p style="margin:0;font-size:10px;color:#374151;">
+            Not financial advice. For informational purposes only.
           </p>
         </td></tr>
 

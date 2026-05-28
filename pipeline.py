@@ -14,6 +14,7 @@ import fetcher as edgar_client
 import db
 from diff import compute_diff, filter_scorable
 from scoring import score_all
+from synthesis import synthesize
 
 SECTIONS = ["item_1a", "item_7", "item_3"]
 
@@ -80,6 +81,7 @@ def alert_mode(ticker: str, form: str = "10-K", sections: list = None) -> dict:
     if len(filings) < 2:
         return {"error": f"fewer than 2 {form} filings found for {ticker}"}
 
+    company_name = edgar_client.get_company_name(ticker)
     new_filing = edgar_client.extract_sections(filings[0])
     old_filing = edgar_client.extract_sections(filings[1])
 
@@ -109,12 +111,30 @@ def alert_mode(ticker: str, form: str = "10-K", sections: list = None) -> dict:
 
         results[section] = diff
 
+    # Synthesis: check cache first, generate if missing or previously errored
+    date_new = new_filing["filing_date"]
+    date_old = old_filing["filing_date"]
+    synthesis = db.get_synthesis(ticker, actual_form, date_new, date_old)
+    if synthesis is None:
+        all_passages = [
+            {**p, "section": sec}
+            for sec, diff_data in results.items()
+            for p in diff_data.get("changed_passages", [])
+        ]
+        synthesis = synthesize(all_passages, ticker, actual_form)
+        if not synthesis.get("_error"):
+            db.upsert_synthesis(ticker, actual_form, date_new, date_old, synthesis)
+        else:
+            print(f"  [pipeline] synthesis failed, not caching: {synthesis.get('_error')}", flush=True)
+
     return {
         "ticker": ticker,
+        "company_name": company_name,
         "filing_type": actual_form,
-        "date_new": new_filing["filing_date"],
-        "date_old": old_filing["filing_date"],
+        "date_new": date_new,
+        "date_old": date_old,
         "sections": results,
+        "synthesis": synthesis,
     }
 
 
@@ -123,6 +143,7 @@ def historical_mode(ticker: str, form: str = "10-K", n: int = 10) -> list[dict]:
     Backfill the last n filings for a ticker and compute diffs between each consecutive pair.
     Returns a list of diff results ordered newest-first.
     """
+    company_name = edgar_client.get_company_name(ticker)
     filings_raw = edgar_client.get_filings(ticker, form=form, n=n)
     filings = [edgar_client.extract_sections(f) for f in filings_raw]
 
@@ -132,14 +153,23 @@ def historical_mode(ticker: str, form: str = "10-K", n: int = 10) -> list[dict]:
     results = []
     for i in range(len(filings) - 1):
         new_f, old_f = filings[i], filings[i + 1]
-        pair_result = {"date_new": new_f["filing_date"], "date_old": old_f["filing_date"], "sections": {}}
+        date_new = new_f["filing_date"]
+        date_old = old_f["filing_date"]
+        pair_result = {
+            "ticker": ticker,
+            "company_name": company_name,
+            "filing_type": form,
+            "date_new": date_new,
+            "date_old": date_old,
+            "sections": {},
+        }
 
         for section in SECTIONS:
-            cached = db.get_diff(ticker, form, new_f["filing_date"], old_f["filing_date"], section)
+            cached = db.get_diff(ticker, form, date_new, date_old, section)
             if cached:
                 cached, updated = _fill_missing_scores(cached, ticker, section)
                 if updated and _should_cache(cached["changed_passages"]):
-                    db.upsert_diff(ticker, form, new_f["filing_date"], old_f["filing_date"], section, cached)
+                    db.upsert_diff(ticker, form, date_new, date_old, section, cached)
                 pair_result["sections"][section] = cached
                 continue
 
@@ -149,11 +179,24 @@ def historical_mode(ticker: str, form: str = "10-K", n: int = 10) -> list[dict]:
             diff["changed_passages"] = scored
 
             if _should_cache(scored):
-                db.upsert_diff(ticker, form, new_f["filing_date"], old_f["filing_date"], section, diff)
+                db.upsert_diff(ticker, form, date_new, date_old, section, diff)
             else:
                 print(f"  [pipeline] all passages failed scoring for {section}, skipping cache")
 
             pair_result["sections"][section] = diff
+
+        # Synthesis for this pair
+        synthesis = db.get_synthesis(ticker, form, date_new, date_old)
+        if synthesis is None:
+            all_passages = [
+                {**p, "section": sec}
+                for sec, diff_data in pair_result["sections"].items()
+                for p in diff_data.get("changed_passages", [])
+            ]
+            synthesis = synthesize(all_passages, ticker, form)
+            if not synthesis.get("_error"):
+                db.upsert_synthesis(ticker, form, date_new, date_old, synthesis)
+        pair_result["synthesis"] = synthesis
 
         results.append(pair_result)
 

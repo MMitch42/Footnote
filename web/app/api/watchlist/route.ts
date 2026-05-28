@@ -27,15 +27,28 @@ export async function POST(req: Request) {
 
   const sb = createServerClient();
 
-  // Gate on pro subscription
+  // Free users: up to 2 tickers. Pro users: unlimited.
   const { data: sub } = await sb
     .from("subscriptions")
     .select("plan")
     .eq("user_id", userId)
     .maybeSingle();
-  if (!sub || sub.plan !== "pro") {
-    return Response.json({ error: "Pro subscription required" }, { status: 403 });
+
+  const isPro = sub?.plan === "pro" || sub?.plan === "research";
+
+  if (!isPro) {
+    const { count } = await sb
+      .from("watchlist")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId);
+    if ((count ?? 0) >= 2) {
+      return Response.json(
+        { error: "Free plan limited to 2 watched tickers. Upgrade to Pro for unlimited watchlist." },
+        { status: 403 }
+      );
+    }
   }
+
   const { data, error } = await sb
     .from("watchlist")
     .upsert(

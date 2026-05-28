@@ -9,6 +9,14 @@ set_identity(f"Mitchell Magid {os.getenv('USER_EMAIL', 'mitchell.magid@gmail.com
 RATE_LIMIT_DELAY = 0.11  # SEC enforces 10 req/sec hard limit
 
 
+def get_company_name(ticker: str) -> str:
+    """Return the company's display name from EDGAR, falling back to the ticker."""
+    try:
+        return Company(ticker).name or ticker
+    except Exception:
+        return ticker
+
+
 def get_filings(ticker: str, form: str = "10-K", n: int = 2):
     """Return the n most recent filings of the given type for a ticker."""
     company = Company(ticker)

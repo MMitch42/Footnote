@@ -25,6 +25,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL;
 type Company = { ticker: string; name: string };
 type RecentEntry = {
   ticker: string;
+  company_name?: string;
   filing_type: string;
   date_new: string;
   date_old: string;
@@ -197,7 +198,7 @@ export default function Home() {
                 href="/sign-up"
                 className="text-sm font-medium px-4 h-8 flex items-center bg-text-primary text-bg-base rounded hover:bg-text-primary/90 transition-colors duration-150"
               >
-                Sign up →
+                Sign up
               </a>
             </Show>
             <Show when="signed-in">
@@ -289,150 +290,7 @@ export default function Home() {
 
       <div className="max-w-5xl mx-auto px-6">
 
-        {/* Live demo */}
-        <div ref={demoRef} className={`mb-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Real example</span>
-            <div className="h-px flex-1 bg-bg-border" />
-            <span className="font-mono text-xs text-text-muted">AAPL · 10-K · Item 1A</span>
-          </div>
-          <p className="text-xs text-text-muted mb-4">
-            Apple rewrote this passage between their Nov 2024 and Oct 2025 annual filings. Footnote flagged it as a 9/10 critical change. Here is what shifted and why it matters.
-          </p>
-
-          <div className="rounded-xl border border-bg-border overflow-hidden">
-            {/* Window chrome */}
-            <div className="px-4 py-2.5 bg-bg-raised border-b border-bg-border flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <div className="w-3 h-3 rounded-full bg-bg-border" />
-                <div className="w-3 h-3 rounded-full bg-bg-border" />
-                <div className="w-3 h-3 rounded-full bg-bg-border" />
-              </div>
-              <div className="flex items-center gap-3 font-mono text-xs">
-                <span className="text-text-muted">{DEMO.dateOld}</span>
-                <span className="text-accent">→</span>
-                <span className="text-text-secondary">{DEMO.dateNew}</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="relative w-1.5 h-1.5 shrink-0">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
-                  {demoInView && <div className="absolute inset-0 rounded-full bg-[#f87171] animate-ping opacity-50" />}
-                </div>
-                <span className="font-mono text-xs font-semibold text-[#f87171]">9/10 Critical</span>
-              </div>
-            </div>
-            {/* Removed */}
-            <div className="flex border-b border-bg-border/50">
-              <div className="w-8 shrink-0 py-3 px-2 text-right font-mono text-xs text-diff-rem-text/40 bg-diff-rem border-r border-bg-border/50 select-none">−</div>
-              <div className="flex-1 px-4 py-3 bg-diff-rem/40">
-                <p className="font-mono text-sm text-diff-rem-text leading-relaxed">{DEMO.old}</p>
-              </div>
-            </div>
-            {/* Added */}
-            <div className="flex border-b border-bg-border/50">
-              <div className="w-8 shrink-0 py-3 px-2 text-right font-mono text-xs text-diff-add-text/40 bg-diff-add border-r border-bg-border/50 select-none">+</div>
-              <div className="flex-1 px-4 py-3 bg-diff-add/40">
-                <p className="font-mono text-sm text-diff-add-text leading-relaxed">{DEMO.new}</p>
-              </div>
-            </div>
-            {/* Analysis */}
-            <div className="px-4 py-3 bg-bg-surface flex items-start gap-3">
-              <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider shrink-0 mt-0.5">AI Analysis</span>
-              <p className="text-sm text-text-secondary leading-relaxed">{DEMO.explanation}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Recent filing changes feed */}
-        {(feedLoading || recentFeed.length > 0) && (
-          <div className="border-t border-bg-border py-14 mb-0">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Recent filing changes</span>
-              </div>
-              <div className="h-px flex-1 bg-bg-border" />
-            </div>
-
-            {feedLoading ? (
-              <div className="space-y-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="h-11 rounded-lg bg-bg-surface animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
-                {recentFeed.map((entry, i) => {
-                  const scoreColor =
-                    entry.max_score >= 9 ? "text-[#f87171]" :
-                    entry.max_score >= 7 ? "text-accent" :
-                    entry.max_score >= 4 ? "text-[#d97706]" : "text-text-muted";
-                  const dotColor =
-                    entry.max_score >= 9 ? "bg-[#f87171]" :
-                    entry.max_score >= 7 ? "bg-accent" :
-                    entry.max_score >= 4 ? "bg-[#d97706]" : "bg-text-muted";
-                  const scoreLabel =
-                    entry.max_score >= 9 ? "Critical" :
-                    entry.max_score >= 7 ? "High" :
-                    entry.max_score >= 4 ? "Notable" : "Low";
-                  const dirLabel =
-                    entry.direction === "escalating" ? "↑ Escalating" :
-                    entry.direction === "reassuring"  ? "↓ Reassuring" : null;
-                  const dirColor =
-                    entry.direction === "escalating" ? "text-[#f87171]" :
-                    entry.direction === "reassuring"  ? "text-diff-add-text" : "";
-
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => router.push(`/diff/${entry.ticker}`)}
-                      className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group"
-                    >
-                      {/* Score dot */}
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
-
-                      {/* Ticker + type */}
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-mono text-sm font-bold text-text-primary">{entry.ticker}</span>
-                        <span className="font-mono text-[10px] px-1 py-0.5 rounded border border-bg-border text-text-muted uppercase">{entry.filing_type}</span>
-                      </div>
-
-                      {/* Score — label hidden on small screens */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={`font-mono text-sm font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
-                        <span className={`text-xs hidden sm:inline ${scoreColor}`}>{scoreLabel}</span>
-                      </div>
-
-                      {/* Direction — abbreviated on mobile */}
-                      <span className={`text-xs shrink-0 ${dirColor || "text-text-muted"}`}>
-                        <span className="sm:hidden">
-                          {entry.direction === "escalating" ? "↑" : entry.direction === "reassuring" ? "↓" : "—"}
-                        </span>
-                        <span className="hidden sm:inline">
-                          {dirLabel ?? "Neutral"}
-                        </span>
-                      </span>
-
-                      {/* Date range */}
-                      <span className="font-mono text-xs text-text-muted hidden sm:block flex-1">
-                        {entry.date_old} <span className="text-accent">→</span> {entry.date_new}
-                      </span>
-
-                      {/* Changes count */}
-                      <span className="text-xs text-text-muted hidden md:block w-20 text-right shrink-0">
-                        {entry.n_changes} change{entry.n_changes !== 1 ? "s" : ""}
-                      </span>
-
-                      <span className="text-text-muted group-hover:text-accent transition-colors text-sm shrink-0">→</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Stats */}
+        {/* Signal / Alpha stats */}
         <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10">
           <div>
             <p className="font-mono text-5xl font-bold text-text-primary mb-1 tabular-nums">
@@ -487,31 +345,195 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Waitlist */}
-        <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-150 ${waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
-          <div className="max-w-lg">
-            <p className="text-lg font-semibold text-text-primary mb-1">Not ready to subscribe?</p>
-            <p className="text-sm text-text-muted mb-6">Leave your email and we&apos;ll let you know when new features ship. No credit card, no spam.</p>
-            {submitted ? (
-              <p className="text-sm text-diff-add-text">Got it. We&apos;ll be in touch.</p>
+        {/* Recent filing changes feed */}
+        {(feedLoading || recentFeed.length > 0) && (
+          <div className="border-t border-bg-border py-14">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Recent filing changes</span>
+              </div>
+              <div className="h-px flex-1 bg-bg-border" />
+            </div>
+
+            {feedLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-11 rounded-lg bg-bg-surface animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
+                ))}
+              </div>
             ) : (
-              <form onSubmit={handleWaitlist} className="flex max-w-sm">
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="your@email.com"
-                  className="flex-1 h-10 px-3 bg-bg-surface border border-bg-border border-r-0 rounded-l text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors duration-150"
-                />
-                <button
-                  type="submit"
-                  className="px-5 h-10 bg-text-primary text-bg-base text-sm font-semibold rounded-r hover:bg-text-primary/90 transition-colors duration-150 whitespace-nowrap"
-                >
-                  Join →
-                </button>
-              </form>
+              <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
+                {recentFeed.map((entry, i) => {
+                  const scoreColor =
+                    entry.max_score >= 9 ? "text-[#f87171]" :
+                    entry.max_score >= 7 ? "text-accent" :
+                    entry.max_score >= 4 ? "text-[#d97706]" : "text-text-muted";
+                  const dotColor =
+                    entry.max_score >= 9 ? "bg-[#f87171]" :
+                    entry.max_score >= 7 ? "bg-accent" :
+                    entry.max_score >= 4 ? "bg-[#d97706]" : "bg-text-muted";
+                  const scoreLabel =
+                    entry.max_score >= 9 ? "Critical" :
+                    entry.max_score >= 7 ? "High" :
+                    entry.max_score >= 4 ? "Notable" : "Low";
+                  const dirLabel =
+                    entry.direction === "escalating" ? "↑ Escalating" :
+                    entry.direction === "reassuring"  ? "↓ Reassuring" : null;
+                  const dirColor =
+                    entry.direction === "escalating" ? "text-[#f87171]" :
+                    entry.direction === "reassuring"  ? "text-diff-add-text" : "";
+
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => router.push(`/diff/${entry.ticker}`)}
+                      className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group"
+                    >
+                      {/* Score dot */}
+                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
+
+                      {/* Company name + ticker + type */}
+                      <div className="flex items-center gap-2 min-w-0">
+                        {entry.company_name ? (
+                          <>
+                            <span className="text-sm font-semibold text-text-primary truncate max-w-[140px] sm:max-w-[200px]">{entry.company_name}</span>
+                            <span className="font-mono text-xs text-text-muted shrink-0">({entry.ticker})</span>
+                          </>
+                        ) : (
+                          <span className="font-mono text-sm font-bold text-text-primary shrink-0">{entry.ticker}</span>
+                        )}
+                        <span className="font-mono text-[10px] px-1 py-0.5 rounded border border-bg-border text-text-muted uppercase shrink-0">{entry.filing_type}</span>
+                      </div>
+
+                      {/* Score — label hidden on small screens */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className={`font-mono text-sm font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
+                        <span className={`text-xs hidden sm:inline ${scoreColor}`}>{scoreLabel}</span>
+                      </div>
+
+                      {/* Direction — abbreviated on mobile */}
+                      <span className={`text-xs shrink-0 ${dirColor || "text-text-muted"}`}>
+                        <span className="sm:hidden">
+                          {entry.direction === "escalating" ? "↑" : entry.direction === "reassuring" ? "↓" : "—"}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {dirLabel ?? "Neutral"}
+                        </span>
+                      </span>
+
+                      {/* Date range */}
+                      <span className="font-mono text-xs text-text-muted hidden sm:block flex-1">
+                        {entry.date_old} <span className="text-accent">→</span> {entry.date_new}
+                      </span>
+
+                      {/* Changes count */}
+                      <span className="text-xs text-text-muted hidden md:block w-20 text-right shrink-0">
+                        {entry.n_changes} change{entry.n_changes !== 1 ? "s" : ""}
+                      </span>
+
+                      <span className="text-text-muted group-hover:text-accent transition-colors text-sm shrink-0">→</span>
+                    </button>
+                  );
+                })}
+              </div>
             )}
+          </div>
+        )}
+
+        {/* Real example — static, pre-baked */}
+        <div ref={demoRef} className={`border-t border-bg-border py-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+          <div className="flex items-center gap-3 mb-2">
+            <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Real example</span>
+            <div className="h-px flex-1 bg-bg-border" />
+            <span className="font-mono text-xs text-text-muted">Apple (AAPL) · 10-K · Item 1A</span>
+          </div>
+          <p className="text-xs text-text-muted mb-4">
+            Apple rewrote this passage between their Nov 2024 and Oct 2025 annual filings. Footnote flagged it as a 9/10 critical change. Here is what shifted and why it matters.
+          </p>
+
+          <div className="rounded-xl border border-bg-border overflow-hidden">
+            {/* Window chrome */}
+            <div className="px-4 py-2.5 bg-bg-raised border-b border-bg-border flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <div className="w-3 h-3 rounded-full bg-bg-border" />
+                <div className="w-3 h-3 rounded-full bg-bg-border" />
+                <div className="w-3 h-3 rounded-full bg-bg-border" />
+              </div>
+              <div className="flex items-center gap-3 font-mono text-xs">
+                <span className="text-text-muted">{DEMO.dateOld}</span>
+                <span className="text-accent">→</span>
+                <span className="text-text-secondary">{DEMO.dateNew}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="relative w-1.5 h-1.5 shrink-0">
+                  <div className="w-1.5 h-1.5 rounded-full bg-[#f87171]" />
+                  {demoInView && <div className="absolute inset-0 rounded-full bg-[#f87171] animate-ping opacity-50" />}
+                </div>
+                <span className="font-mono text-xs font-semibold text-[#f87171]">9/10 Critical</span>
+              </div>
+            </div>
+            {/* Removed */}
+            <div className="flex border-b border-bg-border/50">
+              <div className="w-8 shrink-0 py-3 px-2 text-right font-mono text-xs text-diff-rem-text/40 bg-diff-rem border-r border-bg-border/50 select-none">−</div>
+              <div className="flex-1 px-4 py-3 bg-diff-rem/40">
+                <p className="font-mono text-sm text-diff-rem-text leading-relaxed">{DEMO.old}</p>
+              </div>
+            </div>
+            {/* Added */}
+            <div className="flex border-b border-bg-border/50">
+              <div className="w-8 shrink-0 py-3 px-2 text-right font-mono text-xs text-diff-add-text/40 bg-diff-add border-r border-bg-border/50 select-none">+</div>
+              <div className="flex-1 px-4 py-3 bg-diff-add/40">
+                <p className="font-mono text-sm text-diff-add-text leading-relaxed">{DEMO.new}</p>
+              </div>
+            </div>
+            {/* Analysis */}
+            <div className="px-4 py-3 bg-bg-surface flex items-start gap-3">
+              <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider shrink-0 mt-0.5">AI Analysis</span>
+              <p className="text-sm text-text-secondary leading-relaxed">{DEMO.explanation}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Pricing / Waitlist */}
+        <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-150 ${waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 max-w-2xl">
+            {/* Pro CTA */}
+            <div>
+              <p className="text-lg font-semibold text-text-primary mb-1">Ready to get started?</p>
+              <p className="text-sm text-text-muted mb-4">Full synthesis reports, unlimited watchlist, and weekly email alerts.</p>
+              <a
+                href="/upgrade"
+                className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
+              >
+                See Pro plan →
+              </a>
+            </div>
+            {/* Waitlist */}
+            <div>
+              <p className="text-lg font-semibold text-text-primary mb-1">Not ready yet?</p>
+              <p className="text-sm text-text-muted mb-4">Leave your email — we&apos;ll notify you when new features ship.</p>
+              {submitted ? (
+                <p className="text-sm text-diff-add-text">Got it. We&apos;ll be in touch.</p>
+              ) : (
+                <form onSubmit={handleWaitlist} className="flex max-w-sm">
+                  <input
+                    type="email"
+                    required
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="your@email.com"
+                    className="flex-1 h-10 px-3 bg-bg-surface border border-bg-border border-r-0 rounded-l text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors duration-150"
+                  />
+                  <button
+                    type="submit"
+                    className="px-5 h-10 bg-text-primary text-bg-base text-sm font-semibold rounded-r hover:bg-text-primary/90 transition-colors duration-150 whitespace-nowrap"
+                  >
+                    Join
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
 

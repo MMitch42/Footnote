@@ -4,6 +4,7 @@ import uuid
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pipeline import alert_mode, historical_mode
+import fetcher as edgar_client
 import db
 
 app = FastAPI(title="Footnote API")
@@ -148,7 +149,18 @@ def get_recent(limit: int = 8):
         })
 
     result.sort(key=lambda x: x["date_new"], reverse=True)
-    return result[:limit]
+    result = result[:limit]
+
+    # Attach company names — use edgartools Company lookup (no EDGAR doc parsing, fast)
+    unique_tickers = list({r["ticker"] for r in result})
+    name_map: dict[str, str] = {}
+    for t in unique_tickers:
+        name_map[t] = edgar_client.get_company_name(t)
+
+    for r in result:
+        r["company_name"] = name_map.get(r["ticker"], r["ticker"])
+
+    return result
 
 
 @app.get("/timeline/{ticker}")
@@ -214,10 +226,15 @@ def get_specific_diff(ticker: str, date_new: str, date_old: str, form: str = "10
                      "Run historical backfill first."
         }
 
+    synthesis = db.get_synthesis(ticker.upper(), form, date_new, date_old)
+    company_name = edgar_client.get_company_name(ticker)
+
     return {
         "ticker": ticker.upper(),
+        "company_name": company_name,
         "filing_type": form,
         "date_new": date_new,
         "date_old": date_old,
         "sections": sections,
+        "synthesis": synthesis,
     }

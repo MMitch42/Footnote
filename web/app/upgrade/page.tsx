@@ -8,16 +8,19 @@ import { useUser } from "@clerk/nextjs";
 const FREE_FEATURES = [
   "Latest diff for any public company",
   "Novelty scores on every language change",
-  "Risk Factors, MD&A, and Legal sections",
+  "Risk Factors, MD&A, and Legal Proceedings sections",
+  "Basic analysis summary",
+  "Watchlist: up to 2 tickers",
 ];
 
 const PRO_FEATURES = [
   "Everything in Free",
-  "Watchlist: monitor any company",
-  "Email alerts when filings change above your threshold",
-  "Adjustable novelty threshold per ticker",
-  "AI chat for parsing disclosures",
-  "Weekly digest emails (opt-in)",
+  "Unlimited watchlist",
+  "Full synthesis report — executive summary, concerns & reassurances",
+  "Management sentiment analysis",
+  "Performance implications analysis",
+  "Email alerts when filings change (adjustable threshold)",
+  "Weekly digest (opt-in)",
 ];
 
 type Plan = "free" | "pro" | "research" | null;
@@ -96,7 +99,7 @@ export default function UpgradePage() {
               <div className="flex items-end gap-1.5 mb-1">
                 <span className="font-mono text-4xl font-bold text-text-primary">$0</span>
               </div>
-              <p className="text-xs text-text-muted">No account required.</p>
+              <p className="text-xs text-text-muted">Free forever. No credit card.</p>
             </div>
 
             <Link
@@ -190,6 +193,9 @@ export default function UpgradePage() {
           <Link href="/terms" className="underline hover:text-text-secondary transition-colors">Terms</Link>
           {" "}and{" "}
           <Link href="/privacy" className="underline hover:text-text-secondary transition-colors">Privacy Policy</Link>.
+        </p>
+        <p className="text-xs text-text-muted text-center mt-3">
+          Not financial advice. For informational purposes only.
         </p>
 
       </div>

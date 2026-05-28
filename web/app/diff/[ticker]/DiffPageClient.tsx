@@ -7,6 +7,7 @@ import { Show, UserButton } from "@clerk/nextjs";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
+/* ── Types ──────────────────────────────────────────────────── */
 type Passage = {
   old: string;
   new: string;
@@ -22,18 +23,46 @@ type SectionDiff = {
   unchanged_count: number;
 };
 
+type SynthesisItem = {
+  topic: string;
+  section: string;
+  severity: "high" | "medium" | "low";
+  implication: string;
+};
+
+type Synthesis = {
+  executive_summary: string;
+  management_sentiment: "very_cautious" | "cautious" | "neutral" | "confident" | "very_confident";
+  concerns: SynthesisItem[];
+  reassurances: SynthesisItem[];
+  performance_implications: string;
+};
+
 type DiffResult = {
   ticker: string;
+  company_name?: string;
   filing_type: string;
   date_new: string;
   date_old: string;
   sections: Record<string, SectionDiff>;
+  synthesis?: Synthesis | null;
   error?: string;
 };
 
 type SectionFilter = "all" | "high" | "item_1a" | "item_7" | "item_3";
-type MobileView = "overview" | "list";
+type ActiveTab = "analysis" | "changes";
 
+/* ── Module-level diff cache ────────────────────────────────── */
+// Persists across client-side navigations within the same browser session.
+// Key: ticker|form  or  ticker|form|dateNew|dateOld  (historical)
+const _diffCache = new Map<string, DiffResult>();
+function buildCacheKey(ticker: string, form: string, dateNew?: string | null, dateOld?: string | null) {
+  return dateNew && dateOld
+    ? `${ticker}|${form}|${dateNew}|${dateOld}`
+    : `${ticker}|${form}`;
+}
+
+/* ── Constants ──────────────────────────────────────────────── */
 const SECTION_SHORT: Record<string, string> = {
   item_1a: "1A", item_7: "7", item_3: "3",
 };
@@ -43,6 +72,27 @@ const SECTION_FULL: Record<string, string> = {
   item_3:  "Item 3: Legal Proceedings",
 };
 
+const SENTIMENT_LABEL: Record<string, string> = {
+  very_cautious: "Very Cautious",
+  cautious: "Cautious",
+  neutral: "Neutral",
+  confident: "Confident",
+  very_confident: "Very Confident",
+};
+const SENTIMENT_COLOR: Record<string, string> = {
+  very_cautious: "text-[#f87171]",
+  cautious: "text-[#d97706]",
+  neutral: "text-text-muted",
+  confident: "text-diff-add-text",
+  very_confident: "text-diff-add-text",
+};
+const SEVERITY_DOT: Record<string, string> = {
+  high: "bg-[#f87171]",
+  medium: "bg-accent",
+  low: "bg-text-muted",
+};
+
+/* ── Helpers ────────────────────────────────────────────────── */
 function scoreCfg(score: number | null) {
   if (!score) return null;
   if (score >= 9) return { dot: "bg-[#f87171]", text: "text-[#f87171]", label: "Critical" };
@@ -73,7 +123,7 @@ function shortTopic(explanation: string | null): string {
   return words.slice(0, 5).join(" ") + "…";
 }
 
-function generateInterpretation(
+function generateFallbackSummary(
   ticker: string, filingType: string, passages: Passage[], high: Passage[]
 ): string {
   const esc = passages.filter((p) => p.direction === "escalating").length;
@@ -82,12 +132,12 @@ function generateInterpretation(
   const highRea = high.filter((p) => p.direction === "reassuring").length;
 
   if (high.length === 0)
-    return `${ticker}'s ${filingType} contains ${passages.length} detected language change${passages.length !== 1 ? "s" : ""}. None scored above the high-novelty threshold (7+). The changes may be routine updates or minor rewording.`;
+    return `${ticker}'s ${filingType} contains ${passages.length} detected language change${passages.length !== 1 ? "s" : ""}. None scored above the high-novelty threshold. The changes appear routine.`;
   if (highEsc > highRea * 2)
-    return `${ticker}'s ${filingType} contains ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highEsc} scored as escalating and ${highRea} as reassuring. More language shifted toward added risk disclosure than away from it. Read the individual findings below to judge significance.`;
+    return `${ticker}'s ${filingType} shows ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}. ${highEsc} escalating vs ${highRea} reassuring. Risk language hardened more than it softened.`;
   if (highRea > highEsc * 2)
-    return `${ticker}'s ${filingType} contains ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highRea} scored as reassuring and ${highEsc} as escalating. More language shifted away from risk disclosure than toward it. Read the individual findings below to judge significance.`;
-  return `${ticker}'s ${filingType} contains ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highEsc} escalating and ${highRea} reassuring (${esc} vs ${rea} across all changes). The direction is mixed. Read the individual findings below.`;
+    return `${ticker}'s ${filingType} shows ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}. ${highRea} reassuring vs ${highEsc} escalating. Risk language broadly softened.`;
+  return `${ticker}'s ${filingType} shows ${high.length} high-novelty change${high.length !== 1 ? "s" : ""}: ${highEsc} escalating and ${highRea} reassuring across ${passages.length} total changes.`;
 }
 
 /* ── Word-level diff ─────────────────────────────────────────── */
@@ -97,248 +147,294 @@ function computeWordDiff(oldText: string, newText: string): WordOp[] | null {
   const a = oldText.trim().split(/\s+/).filter(Boolean);
   const b = newText.trim().split(/\s+/).filter(Boolean);
   if (a.length > 500 || b.length > 500) return null;
-
   const m = a.length, n = b.length;
   const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0) as number[]);
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = a[i - 1] === b[j - 1]
-        ? dp[i - 1][j - 1] + 1
-        : Math.max(dp[i - 1][j], dp[i][j - 1]);
-    }
-  }
+  for (let i = 1; i <= m; i++)
+    for (let j = 1; j <= n; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1]+1 : Math.max(dp[i-1][j], dp[i][j-1]);
   const ops: WordOp[] = [];
   let i = m, j = n;
   while (i > 0 || j > 0) {
-    if (i > 0 && j > 0 && a[i - 1] === b[j - 1]) {
-      ops.unshift({ type: "keep", text: a[i - 1] });
-      i--; j--;
-    } else if (j > 0 && (i === 0 || dp[i][j - 1] >= dp[i - 1][j])) {
-      ops.unshift({ type: "ins", text: b[j - 1] });
-      j--;
-    } else {
-      ops.unshift({ type: "del", text: a[i - 1] });
-      i--;
-    }
+    if (i > 0 && j > 0 && a[i-1] === b[j-1]) { ops.unshift({ type:"keep", text:a[i-1] }); i--; j--; }
+    else if (j > 0 && (i === 0 || dp[i][j-1] >= dp[i-1][j])) { ops.unshift({ type:"ins", text:b[j-1] }); j--; }
+    else { ops.unshift({ type:"del", text:a[i-1] }); i--; }
   }
   return ops;
 }
 
-/* ── Briefing panel ─────────────────────────────────────────── */
-function BriefingPanel({
-  data, passages, highPassages, totalPassages, onSelectPassage, onShowList,
-  plan, watching, watchLoading, onToggleWatch,
+/* ── Analysis Panel ─────────────────────────────────────────── */
+function AnalysisPanel({
+  data, allPassages, highPassages, plan,
+  watching, watchLoading, onToggleWatch,
+  onBrowseChanges, onSelectPassage,
 }: {
   data: DiffResult;
-  passages: Passage[];
+  allPassages: Passage[];
   highPassages: Passage[];
-  totalPassages: number;
-  onSelectPassage: (idx: number) => void;
-  onShowList: () => void;
   plan: string;
   watching: boolean;
   watchLoading: boolean;
   onToggleWatch: () => void;
+  onBrowseChanges: () => void;
+  onSelectPassage: (idx: number) => void;
 }) {
-  const highEsc = highPassages.filter((p) => p.direction === "escalating").length;
-  const highRea = highPassages.filter((p) => p.direction === "reassuring").length;
-  const topFindings = passages.slice(0, 5);
+  const synthesis = data.synthesis;
+  const isPro = plan !== "free";
 
-  const verdict =
-    highEsc > highRea * 1.5 ? "ESCALATING" :
-    highRea > highEsc * 1.5 ? "REASSURING" : "MIXED";
-
+  const esc = allPassages.filter((p) => p.direction === "escalating").length;
+  const rea = allPassages.filter((p) => p.direction === "reassuring").length;
+  const verdict = esc > rea * 1.5 ? "ESCALATING" : rea > esc * 1.5 ? "REASSURING" : "MIXED";
   const verdictColor =
     verdict === "ESCALATING" ? "text-diff-rem-text" :
     verdict === "REASSURING" ? "text-diff-add-text" : "text-text-secondary";
 
+  const execSummary = synthesis?.executive_summary ||
+    generateFallbackSummary(data.ticker, data.filing_type, allPassages, highPassages);
+
+  const sentiment = synthesis?.management_sentiment ?? "neutral";
+  const concerns = synthesis?.concerns ?? [];
+  const reassurances = synthesis?.reassurances ?? [];
+  const implications = synthesis?.performance_implications ?? "";
+
+  // Top 5 highest-scored passages for quick navigation
+  const topFindings = [...allPassages]
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 5);
+
   return (
-    <div className="p-4 sm:p-6 space-y-8 max-w-2xl">
-      {/* Header */}
-      <div>
-        <p className="text-xs font-semibold text-accent uppercase tracking-wide mb-1">
-          AI Analysis
-        </p>
-        <p className="font-mono text-xs text-text-muted">
-          {data.ticker} · {data.filing_type} · {data.date_old} → {data.date_new}
-        </p>
-      </div>
+    <div className="overflow-y-auto flex-1 min-h-0">
+      <div className="p-4 sm:p-6 max-w-2xl space-y-7">
 
-      {/* Stats */}
-      <div className="grid grid-cols-3 rounded-lg border border-bg-border divide-x divide-bg-border overflow-hidden">
-        <div className="px-3 sm:px-4 py-3">
-          <p className="font-mono text-xl font-bold text-text-primary">{passages.length}</p>
-          <p className="text-[11px] text-text-secondary mt-0.5">Changes</p>
-        </div>
-        <div className="px-3 sm:px-4 py-3">
-          <p className="font-mono text-xl font-bold text-accent">{highPassages.length}</p>
-          <p className="text-[11px] text-text-secondary mt-0.5">High-novelty</p>
-        </div>
-        <div className="px-3 sm:px-4 py-3">
-          {/* Full word on sm+; arrow + abbreviated word on mobile */}
-          <p className={`font-mono font-bold leading-tight ${verdictColor}`}>
-            <span className="hidden sm:block text-xl">{verdict}</span>
-            <span className="sm:hidden text-sm">
-              {verdict === "ESCALATING" ? "↑ ESC" : verdict === "REASSURING" ? "↓ REA" : "MIX"}
-            </span>
+        {/* Verdict + stats */}
+        <div>
+          <p className={`font-mono text-2xl font-bold mb-2 ${verdictColor}`}>
+            {verdict}
           </p>
-          <p className="text-[11px] text-text-secondary mt-0.5">Direction</p>
+          <p className="font-mono text-xs text-text-muted">
+            {allPassages.length} changes · {highPassages.length} high-novelty ·{" "}
+            {data.filing_type} · {data.date_old} → {data.date_new}
+          </p>
         </div>
-      </div>
 
-      {/* Watch CTA */}
-      {plan === "free" ? (
-        <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-text-primary mb-0.5">Get alerted next time</p>
-              <p className="text-xs text-text-muted leading-relaxed">
-                Know when the next {data.filing_type} drops before most investors notice.
-              </p>
+        {/* Watch / upgrade CTA */}
+        {plan === "free" ? (
+          <div className="rounded-lg border border-accent/30 bg-accent/5 p-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-text-primary mb-0.5">Get alerted next time</p>
+                <p className="text-xs text-text-muted leading-relaxed">
+                  Know when the next {data.filing_type} drops before most investors notice.
+                </p>
+              </div>
+              <a
+                href="/upgrade"
+                className="shrink-0 text-xs font-bold px-3 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap"
+              >
+                Get Pro · $9/mo
+              </a>
             </div>
-            <a
-              href="/upgrade"
-              className="shrink-0 text-xs font-bold px-3 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap"
-            >
-              Get Pro · $9/mo
-            </a>
           </div>
-        </div>
-      ) : watching ? (
-        <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 flex items-center gap-3">
-          <span className="text-accent text-lg shrink-0">★</span>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-text-primary">Watching {data.ticker}</p>
-            <p className="text-xs text-text-muted">
-              You&apos;ll be alerted when the next {data.filing_type} drops.
-            </p>
-          </div>
-          <button
-            onClick={onToggleWatch}
-            disabled={watchLoading}
-            className="text-[11px] text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 shrink-0"
-          >
-            {watchLoading ? "…" : "Unwatch"}
-          </button>
-        </div>
-      ) : (
-        <div className="rounded-lg border border-bg-border bg-bg-raised px-4 py-3">
-          <div className="flex items-center justify-between gap-4">
-            <div className="min-w-0">
-              <p className="text-sm font-semibold text-text-primary mb-0.5">☆ Watch {data.ticker}</p>
-              <p className="text-xs text-text-muted leading-relaxed">
-                Get emailed the moment the next {data.filing_type} drops.
-              </p>
+        ) : watching ? (
+          <div className="rounded-lg border border-accent/30 bg-accent/5 px-4 py-3 flex items-center gap-3">
+            <span className="text-accent shrink-0">★</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-text-primary">Watching {data.ticker}</p>
+              <p className="text-xs text-text-muted">You&apos;ll be alerted when the next {data.filing_type} drops.</p>
             </div>
-            <button
-              onClick={onToggleWatch}
-              disabled={watchLoading}
-              className="shrink-0 text-xs font-bold px-3 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap disabled:opacity-50"
-            >
-              {watchLoading ? "…" : "Watch →"}
+            <button onClick={onToggleWatch} disabled={watchLoading}
+              className="text-[11px] text-text-muted hover:text-text-secondary transition-colors disabled:opacity-50 shrink-0">
+              {watchLoading ? "…" : "Unwatch"}
             </button>
           </div>
-        </div>
-      )}
-
-      {/* Interpretation */}
-      <div>
-        <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">
-          Interpretation
-        </p>
-        <p className="text-sm text-text-secondary leading-relaxed border-l-2 border-accent/40 pl-3">
-          {generateInterpretation(data.ticker, data.filing_type, passages, highPassages)}
-        </p>
-      </div>
-
-      {/* Top findings */}
-      {topFindings.length > 0 && (
-        <div>
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
-            Top findings
-          </p>
-          <div className="space-y-3">
-            {topFindings.map((p, i) => (
-              <button
-                key={i}
-                onClick={() => onSelectPassage(i)}
-                className="w-full text-left flex gap-3 items-start group"
-              >
-                <ScoreBadge score={p.score} />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-text-secondary leading-snug group-hover:text-text-primary transition-colors">
-                    {p.explanation}
-                  </p>
-                  {p.section && (
-                    <p className="font-mono text-[10px] text-text-muted mt-0.5 uppercase tracking-wider">
-                      {SECTION_FULL[p.section] ?? p.section}
-                    </p>
-                  )}
-                </div>
-                <span className="text-sm text-text-muted group-hover:text-accent transition-colors shrink-0 mt-0.5">→</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Mobile: view all changes CTA */}
-      {totalPassages > 0 && (
-        <button
-          onClick={onShowList}
-          className="md:hidden w-full h-11 flex items-center justify-center gap-2 border border-bg-border rounded-xl text-sm font-medium text-text-primary hover:border-accent/40 hover:text-accent transition-colors"
-        >
-          Browse all {totalPassages} changes →
-        </button>
-      )}
-
-      {/* Section breakdown */}
-      <div>
-        <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
-          Section breakdown
-        </p>
-        <div className="rounded-lg border border-bg-border divide-y divide-bg-border overflow-hidden">
-          {Object.entries(data.sections).map(([key, diff]) => {
-            const d = diff as SectionDiff;
-            const sp = d.changed_passages ?? [];
-            if (sp.length === 0) return null;
-            const sEsc = sp.filter((p) => p.direction === "escalating").length;
-            const sRea = sp.filter((p) => p.direction === "reassuring").length;
-            const sHigh = sp.filter((p) => (p.score ?? 0) >= 7).length;
-            return (
-              <div key={key} className="px-4 py-3 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-sm text-text-primary">{SECTION_FULL[key] ?? key}</p>
-                  <p className="text-xs text-text-secondary mt-0.5">
-                    {sp.length} changes · {sHigh} high-novelty · {Math.min(Math.round(d.change_ratio * 100), 100)}% of section
-                  </p>
-                </div>
-                <div className="flex gap-1.5 shrink-0">
-                  {sEsc > 0 && (
-                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-rem/30 text-diff-rem-text">
-                      ↑ {sEsc}
-                    </span>
-                  )}
-                  {sRea > 0 && (
-                    <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-add/30 text-diff-add-text">
-                      ↓ {sRea}
-                    </span>
-                  )}
-                </div>
+        ) : (
+          <div className="rounded-lg border border-bg-border bg-bg-raised px-4 py-3">
+            <div className="flex items-center justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-text-primary mb-0.5">☆ Watch {data.ticker}</p>
+                <p className="text-xs text-text-muted leading-relaxed">
+                  Get emailed when the next {data.filing_type} drops.
+                </p>
               </div>
-            );
-          })}
-        </div>
-      </div>
+              <button onClick={onToggleWatch} disabled={watchLoading}
+                className="shrink-0 text-xs font-bold px-3 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap disabled:opacity-50">
+                {watchLoading ? "…" : "Watch"}
+              </button>
+            </div>
+          </div>
+        )}
 
-      <p className="hidden md:block text-xs text-text-muted">
-        Click a finding above or use ↑ ↓ to browse · Esc returns here
-      </p>
+        {/* Management sentiment — Pro only */}
+        {isPro && synthesis && (
+          <div className="flex items-center gap-3">
+            <p className="text-xs text-text-muted uppercase tracking-wide font-semibold shrink-0">Management tone</p>
+            <span className={`text-sm font-semibold ${SENTIMENT_COLOR[sentiment] ?? "text-text-muted"}`}>
+              {SENTIMENT_LABEL[sentiment] ?? sentiment}
+            </span>
+          </div>
+        )}
+
+        {/* Executive summary */}
+        <div>
+          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">Summary</p>
+          <p className="text-sm text-text-secondary leading-relaxed border-l-2 border-accent/40 pl-3">
+            {execSummary}
+          </p>
+        </div>
+
+        {/* Concerns */}
+        {isPro && concerns.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
+              New concerns <span className="text-diff-rem-text ml-1">{concerns.length}</span>
+            </p>
+            <div className="space-y-3">
+              {concerns.map((c, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${SEVERITY_DOT[c.severity] ?? "bg-text-muted"}`} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-text-primary leading-snug">{c.topic}</p>
+                    <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{c.implication}</p>
+                    {c.section && (
+                      <p className="font-mono text-[10px] text-text-muted/60 mt-1 uppercase tracking-wider">
+                        {SECTION_FULL[c.section] ?? c.section}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Free gate — teaser */}
+        {!isPro && synthesis && (concerns.length > 0 || reassurances.length > 0) && (
+          <div className="rounded-lg border border-bg-border bg-bg-surface p-4 space-y-2">
+            {concerns.length > 0 && (
+              <p className="text-xs text-text-muted">
+                <span className="text-diff-rem-text font-semibold">{concerns.length} concern{concerns.length !== 1 ? "s" : ""}</span> identified
+              </p>
+            )}
+            {reassurances.length > 0 && (
+              <p className="text-xs text-text-muted">
+                <span className="text-diff-add-text font-semibold">{reassurances.length} reassurance{reassurances.length !== 1 ? "s" : ""}</span> identified
+              </p>
+            )}
+            <a href="/upgrade" className="inline-block text-xs font-semibold text-accent hover:text-accent-bright transition-colors mt-1">
+              Read full intelligence report — Pro
+            </a>
+          </div>
+        )}
+
+        {/* Reassurances */}
+        {isPro && reassurances.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">
+              Reassurances <span className="text-diff-add-text ml-1">{reassurances.length}</span>
+            </p>
+            <div className="space-y-3">
+              {reassurances.map((r, i) => (
+                <div key={i} className="flex gap-3">
+                  <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${SEVERITY_DOT[r.severity] ?? "bg-text-muted"}`} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-text-primary leading-snug">{r.topic}</p>
+                    <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{r.implication}</p>
+                    {r.section && (
+                      <p className="font-mono text-[10px] text-text-muted/60 mt-1 uppercase tracking-wider">
+                        {SECTION_FULL[r.section] ?? r.section}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Performance implications */}
+        {isPro && implications && (
+          <div>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-2">Business outlook</p>
+            <p className="text-sm text-text-secondary leading-relaxed border-l-2 border-bg-border pl-3">
+              {implications}
+            </p>
+          </div>
+        )}
+
+        {/* Top findings — Pro only, quick navigation into Changes tab */}
+        {isPro && topFindings.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Top findings</p>
+            <div className="space-y-3">
+              {topFindings.map((p, i) => (
+                <button key={i} onClick={() => onSelectPassage(i)}
+                  className="w-full text-left flex gap-3 items-start group">
+                  <ScoreBadge score={p.score} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-text-secondary leading-snug group-hover:text-text-primary transition-colors">
+                      {p.explanation ?? "Language change detected."}
+                    </p>
+                    {p.section && (
+                      <p className="font-mono text-[10px] text-text-muted mt-0.5 uppercase tracking-wider">
+                        {SECTION_FULL[p.section] ?? p.section}
+                      </p>
+                    )}
+                  </div>
+                  <span className="text-sm text-text-muted group-hover:text-accent transition-colors shrink-0 mt-0.5">→</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Section breakdown */}
+        {allPassages.length > 0 && (
+          <div>
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-3">Section breakdown</p>
+            <div className="rounded-lg border border-bg-border divide-y divide-bg-border overflow-hidden">
+              {Object.entries(data.sections).map(([key, diff]) => {
+                const d = diff as SectionDiff;
+                const sp = d.changed_passages ?? [];
+                if (sp.length === 0) return null;
+                const sEsc = sp.filter((p) => p.direction === "escalating").length;
+                const sRea = sp.filter((p) => p.direction === "reassuring").length;
+                const sHigh = sp.filter((p) => (p.score ?? 0) >= 7).length;
+                return (
+                  <div key={key} className="px-4 py-3 flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-sm text-text-primary">{SECTION_FULL[key] ?? key}</p>
+                      <p className="text-xs text-text-secondary mt-0.5">
+                        {sp.length} changes · {sHigh} high-novelty · {Math.min(Math.round(d.change_ratio * 100), 100)}% of section
+                      </p>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      {sEsc > 0 && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-rem/30 text-diff-rem-text">↑ {sEsc}</span>}
+                      {sRea > 0 && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-add/30 text-diff-add-text">↓ {sRea}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Browse all changes */}
+        {allPassages.length > 0 && (
+          <button onClick={onBrowseChanges}
+            className="w-full h-11 flex items-center justify-center gap-2 border border-bg-border rounded-xl text-sm font-medium text-text-primary hover:border-accent/40 hover:text-accent transition-colors">
+            Browse all {allPassages.length} changes →
+          </button>
+        )}
+
+        <p className="text-xs text-text-muted pb-2">
+          Not financial advice. For informational purposes only.
+        </p>
+
+      </div>
     </div>
   );
 }
 
-/* ── Left panel: passage row ────────────────────────────────── */
+/* ── Passage row ────────────────────────────────────────────── */
 function PassageRow({
   passage, isSelected, onClick, rowRef,
 }: {
@@ -347,121 +443,61 @@ function PassageRow({
   onClick: () => void;
   rowRef?: React.Ref<HTMLButtonElement>;
 }) {
-  const dirLabel =
-    passage.direction === "escalating" ? "↑ Esc" :
-    passage.direction === "reassuring" ? "↓ Rea" : null;
-  const dirColor =
-    passage.direction === "escalating" ? "text-diff-rem-text/70" :
-    passage.direction === "reassuring" ? "text-diff-add-text/70" : "";
-
+  const dirLabel = passage.direction === "escalating" ? "↑ Esc" : passage.direction === "reassuring" ? "↓ Rea" : null;
+  const dirColor = passage.direction === "escalating" ? "text-diff-rem-text/70" : passage.direction === "reassuring" ? "text-diff-add-text/70" : "";
   return (
-    <button
-      ref={rowRef}
-      onClick={onClick}
+    <button ref={rowRef} onClick={onClick}
       className={`w-full text-left px-3 py-2.5 border-b border-bg-border border-l-2 flex flex-col gap-1 transition-colors duration-100 ${
         isSelected ? "bg-bg-raised border-l-accent" : "border-l-transparent hover:bg-bg-surface"
-      }`}
-    >
+      }`}>
       <div className="flex items-center gap-2 flex-wrap">
         <ScoreBadge score={passage.score} />
-        {passage.section && (
-          <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">
-            {SECTION_SHORT[passage.section] ?? passage.section}
-          </span>
-        )}
-        {dirLabel && (
-          <span className={`text-[11px] ${dirColor}`}>{dirLabel}</span>
-        )}
+        {passage.section && <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider">{SECTION_SHORT[passage.section] ?? passage.section}</span>}
+        {dirLabel && <span className={`text-[11px] ${dirColor}`}>{dirLabel}</span>}
       </div>
-      <p className={`text-xs leading-snug line-clamp-1 ${
-        isSelected ? "text-text-primary" : "text-text-muted"
-      }`}>
+      <p className={`text-xs leading-snug line-clamp-1 ${isSelected ? "text-text-primary" : "text-text-muted"}`}>
         {shortTopic(passage.explanation)}
       </p>
     </button>
   );
 }
 
-/* ── Right panel: passage detail ───────────────────────────── */
-function PassageDetail({
-  passage, onBack, isPro,
-}: {
-  passage: Passage;
-  onBack: () => void;
-  isPro: boolean;
-}) {
+/* ── Passage detail ─────────────────────────────────────────── */
+function PassageDetail({ passage, onBack, isPro }: { passage: Passage; onBack: () => void; isPro: boolean }) {
   const [showWordDiff, setShowWordDiff] = useState(false);
-
   const wordDiffOps = useMemo(
-    () =>
-      isPro && passage.old && passage.new
-        ? computeWordDiff(passage.old, passage.new)
-        : null,
+    () => isPro && passage.old && passage.new ? computeWordDiff(passage.old, passage.new) : null,
     [isPro, passage.old, passage.new]
   );
-
-  const hasWordDiff = wordDiffOps !== null;
-
   return (
     <div>
-      {/* Header bar */}
       <div className="px-6 py-2.5 border-b border-bg-border bg-bg-base flex items-center justify-between">
-        <button
-          onClick={onBack}
-          className="text-xs text-text-muted hover:text-accent transition-colors duration-150"
-        >
-          ← Back
-        </button>
-        {isPro && hasWordDiff && (
-          <button
-            onClick={() => setShowWordDiff((w) => !w)}
+        <button onClick={onBack} className="text-xs text-text-muted hover:text-accent transition-colors duration-150">← Back</button>
+        {isPro && wordDiffOps && (
+          <button onClick={() => setShowWordDiff((w) => !w)}
             className={`flex items-center gap-1.5 text-[10px] font-mono font-semibold uppercase tracking-wider px-2.5 py-1 rounded border transition-colors duration-150 ${
-              showWordDiff
-                ? "border-accent text-accent bg-accent/10"
-                : "border-bg-border text-text-muted hover:border-accent hover:text-accent"
-            }`}
-          >
-            {showWordDiff ? (
-              <>
-                <span className="inline-block w-2 h-2 rounded-sm bg-diff-rem-text/70 opacity-80" />
-                <span className="inline-block w-2 h-2 rounded-sm bg-diff-add-text/70 opacity-80 -ml-0.5" />
-                Word diff on
-              </>
-            ) : (
-              <>Word diff</>
-            )}
+              showWordDiff ? "border-accent text-accent bg-accent/10" : "border-bg-border text-text-muted hover:border-accent hover:text-accent"
+            }`}>
+            {showWordDiff ? (<><span className="inline-block w-2 h-2 rounded-sm bg-diff-rem-text/70 opacity-80" /><span className="inline-block w-2 h-2 rounded-sm bg-diff-add-text/70 opacity-80 -ml-0.5" />Word diff on</>) : "Word diff"}
           </button>
         )}
       </div>
-
-      {/* Explanation + score */}
       <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-bg-border bg-bg-surface flex items-start justify-between gap-4">
         <p className="text-sm text-text-secondary leading-relaxed flex-1 min-w-0">
           {passage.explanation ?? "Language change detected."}
         </p>
         <div className="shrink-0 flex flex-col items-end gap-1.5">
           <ScoreBadge score={passage.score} />
-          {passage.section && (
-            <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider text-right">
-              {SECTION_FULL[passage.section] ?? passage.section}
-            </span>
-          )}
+          {passage.section && <span className="font-mono text-[10px] text-text-muted uppercase tracking-wider text-right">{SECTION_FULL[passage.section] ?? passage.section}</span>}
         </div>
       </div>
-
       {showWordDiff && wordDiffOps ? (
         <div>
           <div className="px-6 py-2 bg-bg-raised border-b border-bg-border/50 flex items-center justify-between">
             <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Inline diff</span>
             <div className="flex items-center gap-3 text-[10px] text-text-muted">
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-3 h-3 rounded-sm bg-diff-rem/60" />
-                removed
-              </span>
-              <span className="flex items-center gap-1">
-                <span className="inline-block w-3 h-3 rounded-sm bg-diff-add/60" />
-                added
-              </span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-diff-rem/60" />removed</span>
+              <span className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-diff-add/60" />added</span>
             </div>
           </div>
           <div className="px-4 sm:px-6 py-4 sm:py-5">
@@ -469,22 +505,8 @@ function PassageDetail({
               {wordDiffOps.map((op, idx) => {
                 const sp = idx > 0 ? " " : "";
                 if (op.type === "keep") return <span key={idx}>{sp}{op.text}</span>;
-                if (op.type === "del") return (
-                  <span key={idx}>
-                    {sp}
-                    <mark className="bg-diff-rem/50 text-diff-rem-text line-through px-0.5 rounded-sm not-italic">
-                      {op.text}
-                    </mark>
-                  </span>
-                );
-                if (op.type === "ins") return (
-                  <span key={idx}>
-                    {sp}
-                    <mark className="bg-diff-add/50 text-diff-add-text px-0.5 rounded-sm not-italic font-semibold">
-                      {op.text}
-                    </mark>
-                  </span>
-                );
+                if (op.type === "del") return <span key={idx}>{sp}<mark className="bg-diff-rem/50 text-diff-rem-text line-through px-0.5 rounded-sm not-italic">{op.text}</mark></span>;
+                if (op.type === "ins") return <span key={idx}>{sp}<mark className="bg-diff-add/50 text-diff-add-text px-0.5 rounded-sm not-italic font-semibold">{op.text}</mark></span>;
                 return null;
               })}
             </p>
@@ -526,8 +548,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const dateNew = searchParams.get("date_new");
   const dateOld = searchParams.get("date_old");
   const isHistorical = !!(dateNew && dateOld);
-
-  // Filing type toggle (non-historical mode only)
   const typeParam = searchParams.get("type") as "10-K" | "10-Q" | null;
   const [filingType, setFilingType] = useState<"10-K" | "10-Q">(typeParam ?? "10-K");
 
@@ -535,28 +555,33 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const [loading, setLoading] = useState(true);
   const [slowLoad, setSlowLoad] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<ActiveTab>("analysis");
   const [filter, setFilter] = useState<SectionFilter>("all");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
   const selectedRowRef = useRef<HTMLButtonElement>(null);
+
   const [watching, setWatching] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research">("free");
 
-  // Mobile layout state
-  const [mobileView, setMobileView] = useState<MobileView>("overview");
-  // Remember which panel we came from when opening a detail
-  const [prevMobileView, setPrevMobileView] = useState<MobileView>("overview");
-
-  // Fetch diff data
+  // Fetch diff data — check module-level cache first
   useEffect(() => {
+    const cacheKey = buildCacheKey(ticker, filingType, dateNew, dateOld);
+    const cached = _diffCache.get(cacheKey);
+    if (cached) {
+      setData(cached);
+      setLoading(false);
+      return;
+    }
+
     setData(null);
     setLoading(true);
     setSlowLoad(false);
     setError(null);
     setSelectedIdx(null);
-    setMobileView("overview");
+    setActiveTab("analysis");
 
-    // After 25s, surface a "still working" message so users don't bail
     const slowTimer = setTimeout(() => setSlowLoad(true), 25_000);
 
     const url = isHistorical
@@ -565,7 +590,12 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
     fetch(url, { signal: AbortSignal.timeout(120_000) })
       .then((r) => r.json())
-      .then((d) => { clearTimeout(slowTimer); setData(d); setLoading(false); })
+      .then((d) => {
+        clearTimeout(slowTimer);
+        _diffCache.set(cacheKey, d);
+        setData(d);
+        setLoading(false);
+      })
       .catch((e) => {
         clearTimeout(slowTimer);
         const msg = e?.name === "TimeoutError"
@@ -578,7 +608,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     return () => clearTimeout(slowTimer);
   }, [ticker, dateNew, dateOld, isHistorical, filingType]);
 
-  // Check watchlist status + subscription
+  // Check watchlist + subscription
   useEffect(() => {
     Promise.all([
       fetch("/api/watchlist").then((r) => r.ok ? r.json() : []),
@@ -591,10 +621,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
   const switchFilingType = (type: "10-K" | "10-Q") => {
     if (type === filingType) return;
-    if (type === "10-Q" && plan === "free") {
-      router.push("/upgrade");
-      return;
-    }
+    if (type === "10-Q" && plan === "free") { router.push("/upgrade"); return; }
     setFilingType(type);
     router.replace(`/diff/${ticker}?type=${type}`, { scroll: false });
   };
@@ -621,9 +648,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
   const allPassages: Passage[] = data
     ? Object.entries(data.sections)
-        .flatMap(([section, diff]) =>
-          (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section }))
-        )
+        .flatMap(([section, diff]) => (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section })))
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     : [];
 
@@ -637,13 +662,12 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const selected = selectedIdx !== null ? filtered[selectedIdx] ?? null : null;
 
   const sectionCounts = data
-    ? Object.fromEntries(
-        Object.entries(data.sections).map(([k, v]) => [k, (v as SectionDiff).changed_passages.length])
-      )
+    ? Object.fromEntries(Object.entries(data.sections).map(([k, v]) => [k, (v as SectionDiff).changed_passages.length]))
     : {};
 
-  // Keyboard navigation
+  // Keyboard navigation (only active on Changes tab)
   useEffect(() => {
+    if (activeTab !== "changes") return;
     const handler = (e: KeyboardEvent) => {
       if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => i === null ? 0 : Math.min(i + 1, filtered.length - 1)); }
       if (e.key === "ArrowUp")   { e.preventDefault(); setSelectedIdx((i) => i === null ? 0 : Math.max(i - 1, 0)); }
@@ -651,24 +675,24 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [filtered.length]);
+  }, [filtered.length, activeTab]);
 
-  useEffect(() => {
-    selectedRowRef.current?.scrollIntoView({ block: "nearest" });
-  }, [selectedIdx]);
+  useEffect(() => { selectedRowRef.current?.scrollIntoView({ block: "nearest" }); }, [selectedIdx]);
 
-  // Select a passage (captures mobile context)
-  const selectPassage = (idx: number, fromView: MobileView = mobileView) => {
-    setPrevMobileView(fromView);
+  // Opening a passage from Analysis tab switches to Changes tab
+  const selectPassageFromAnalysis = (idx: number) => {
+    setActiveTab("changes");
+    setFilter("all");
     setSelectedIdx(idx);
   };
 
-  // Mobile layout visibility
-  const listVisible = mobileView === "list" && selectedIdx === null;
-  const rightVisible = !listVisible; // overview or detail
+  const companyDisplay = data?.company_name && data.company_name !== ticker.toUpperCase()
+    ? `${data.company_name} (${data.ticker})`
+    : (data?.ticker ?? ticker.toUpperCase());
 
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-bg-base">
+
       {/* Nav */}
       <nav className="shrink-0 border-b border-bg-border bg-bg-base">
         <div className="px-6 h-10 flex items-center justify-between">
@@ -677,38 +701,27 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               FOOTNOTE
             </Link>
             <span className="text-text-muted">/</span>
-            <span className="font-mono text-sm text-accent uppercase tracking-wider">{ticker}</span>
+            <span className="font-mono text-sm text-accent uppercase tracking-wider truncate max-w-[180px]">
+              {data?.company_name && data.company_name !== ticker.toUpperCase()
+                ? data.company_name
+                : ticker.toUpperCase()}
+            </span>
           </div>
           <Show when="signed-in">
             <div className="flex items-center gap-4">
-              <button
-                onClick={toggleWatch}
-                disabled={watchLoading}
+              <button onClick={toggleWatch} disabled={watchLoading}
                 className={`text-xs font-medium px-3 h-7 rounded border transition-colors duration-150 disabled:opacity-50 ${
-                  watching
-                    ? "border-accent text-accent hover:bg-accent/10"
-                    : "border-bg-border text-text-muted hover:border-accent hover:text-accent"
-                }`}
-              >
+                  watching ? "border-accent text-accent hover:bg-accent/10" : "border-bg-border text-text-muted hover:border-accent hover:text-accent"
+                }`}>
                 {watchLoading ? "…" : watching ? "★ Watching" : "☆ Watch"}
               </button>
               {plan === "research" && (
-                <Link
-                  href={`/history/${ticker}`}
-                  className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150"
-                >
-                  History
-                </Link>
+                <Link href={`/history/${ticker}`} className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">History</Link>
               )}
-              <Link href="/watchlist" className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">
-                Watchlist
-              </Link>
+              <Link href="/watchlist" className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">Watchlist</Link>
               {plan === "free" && (
-                <a
-                  href="/upgrade"
-                  className="text-xs font-semibold px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap"
-                >
-                  Get Pro →
+                <a href="/upgrade" className="text-xs font-semibold px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap">
+                  Get Pro
                 </a>
               )}
               <UserButton appearance={{ variables: { colorPrimary: "#f59e0b" }, elements: { avatarBox: "w-7 h-7" } }} />
@@ -716,15 +729,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           </Show>
           <Show when="signed-out">
             <div className="flex items-center gap-3">
-              <a href="/sign-in" className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150">
-                Sign in
-              </a>
-              <a
-                href="/sign-up"
-                className="text-xs font-medium px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150"
-              >
-                Get alerts →
-              </a>
+              <a href="/sign-in" className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150">Sign in</a>
+              <a href="/sign-up" className="text-xs font-medium px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150">Get alerts</a>
             </div>
           </Show>
         </div>
@@ -733,17 +739,15 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
       {loading && (
         <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
           <div className="flex gap-1">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-            ))}
+            {[0,1,2].map((i) => <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />)}
           </div>
           <p className="text-xs text-text-muted">Analyzing {ticker.toUpperCase()}…</p>
           {slowLoad ? (
             <p className="text-xs text-text-muted max-w-xs leading-relaxed">
-              Still working — large filings with many changes can take up to a minute on first analysis. Subsequent loads are instant.
+              Still working — large filings can take up to a minute on first analysis. Subsequent loads are instant.
             </p>
           ) : (
-            <p className="text-xs text-text-muted">First lookup ~20s · subsequent loads instant</p>
+            <p className="text-xs text-text-muted">First analysis ~20–30s · subsequent loads instant</p>
           )}
         </div>
       )}
@@ -751,193 +755,145 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
       {error && (
         <div className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
           <p className="text-sm font-semibold text-text-primary">Could not load filing data</p>
-          <p className="text-xs text-text-muted max-w-sm leading-relaxed">
-            The analysis service may be temporarily unavailable. Check back in a moment.
-          </p>
-          <button
-            onClick={() => window.history.back()}
-            className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
-          >
-            Go back
-          </button>
+          <p className="text-xs text-text-muted max-w-sm leading-relaxed">The analysis service may be temporarily unavailable. Check back in a moment.</p>
+          <button onClick={() => window.history.back()} className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors">Go back</button>
         </div>
       )}
 
       {data && !data.error && (
         <>
           {/* Filing header */}
-          <div className="shrink-0 px-4 sm:px-6 py-3 border-b border-bg-border bg-bg-surface flex items-center gap-3 overflow-x-auto">
+          <div className="shrink-0 px-4 sm:px-6 py-2.5 border-b border-bg-border bg-bg-surface flex items-center gap-3 overflow-x-auto">
             {isHistorical && (
-              <Link
-                href={`/history/${ticker}`}
-                className="text-xs text-text-muted hover:text-accent transition-colors duration-150 shrink-0 mr-1"
-              >
-                ← History
-              </Link>
+              <Link href={`/history/${ticker}`} className="text-xs text-text-muted hover:text-accent transition-colors duration-150 shrink-0 mr-1">← History</Link>
             )}
-            <span className="font-mono text-sm font-bold text-text-primary uppercase tracking-wide shrink-0">{data.ticker}</span>
-            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase tracking-wider shrink-0">
-              {data.filing_type}
-            </span>
+            <span className="text-sm font-semibold text-text-primary shrink-0">{companyDisplay}</span>
+            <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase tracking-wider shrink-0">{data.filing_type}</span>
             <div className="flex items-center gap-2 font-mono text-xs shrink-0">
               <span className="text-text-muted">{data.date_old}</span>
               <span className="text-accent">→</span>
               <span className="text-text-secondary">{data.date_new}</span>
             </div>
-            <span className="hidden sm:block text-xs text-text-secondary ml-auto shrink-0">
-              {allPassages.length} changes · {highPassages.length} high-novelty
-            </span>
+            {/* Filing type toggle */}
+            {!isHistorical && (
+              <div className="ml-auto flex items-center gap-1 shrink-0">
+                {(["10-K", "10-Q"] as const).map((t) => (
+                  <button key={t} onClick={() => switchFilingType(t)}
+                    title={t === "10-Q" && plan === "free" ? "10-Q diffs require Pro" : undefined}
+                    className={`font-mono text-[10px] px-2 py-1 rounded border uppercase tracking-wider transition-colors duration-150 ${
+                      filingType === t ? "border-accent text-accent bg-accent/10" :
+                      t === "10-Q" && plan === "free" ? "border-transparent text-text-muted/50 hover:text-accent hover:border-accent/40" :
+                      "border-transparent text-text-muted hover:text-text-secondary"
+                    }`}>
+                    {t}{t === "10-Q" && plan === "free" && <span className="ml-1 text-[8px] font-bold text-accent/70 uppercase">Pro</span>}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* Alert banner for free users */}
           {plan === "free" && (() => {
             const daysAgo = Math.floor((Date.now() - new Date(data.date_new).getTime()) / (1000 * 60 * 60 * 24));
             if (daysAgo < 1) return null;
-            const urgentChanges = highPassages.length;
             return (
-              <div className="shrink-0 px-4 py-2.5 bg-accent/8 border-b border-accent/20 flex items-center justify-between gap-4 flex-wrap">
+              <div className="shrink-0 px-4 py-2 bg-accent/8 border-b border-accent/20 flex items-center justify-between gap-4 flex-wrap">
                 <p className="text-xs text-text-secondary leading-relaxed">
                   <span className="text-accent font-semibold">Pro subscribers were alerted {daysAgo} day{daysAgo !== 1 ? "s" : ""} ago</span>
-                  {urgentChanges > 0
-                    ? ` with ${urgentChanges} high-novelty change${urgentChanges !== 1 ? "s" : ""} flagged.`
-                    : ` when this ${data.filing_type} dropped.`}
+                  {highPassages.length > 0 ? ` — ${highPassages.length} high-novelty change${highPassages.length !== 1 ? "s" : ""} flagged.` : "."}
                 </p>
-                <a
-                  href="/upgrade"
-                  className="shrink-0 text-xs font-semibold px-3 py-1.5 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap"
-                >
-                  Get Pro for $9/mo →
+                <a href="/upgrade" className="shrink-0 text-xs font-semibold px-3 py-1.5 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors whitespace-nowrap">
+                  Get Pro for $9/mo
                 </a>
               </div>
             );
           })()}
 
-          {/* Filter bar */}
-          <div className="shrink-0 border-b border-bg-border bg-bg-base flex overflow-x-auto">
-            {(["all", "high", "item_1a", "item_7", "item_3"] as SectionFilter[]).map((f) => {
-              const count =
-                f === "all"  ? allPassages.length :
-                f === "high" ? highPassages.length :
-                (sectionCounts[f] ?? 0);
-              if (f !== "all" && f !== "high" && count === 0) return null;
-              if (f === "high" && highPassages.length === 0) return null;
-              const label =
-                f === "all"  ? `All (${count})` :
-                f === "high" ? `High (${count})` :
-                `Item ${SECTION_SHORT[f]} (${count})`;
-              const isActive = filter === f;
-              return (
-                <button
-                  key={f}
-                  onClick={() => { setFilter(f); setSelectedIdx(null); }}
-                  className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
-                    isActive
-                      ? "border-accent text-text-primary font-medium"
-                      : "border-transparent text-text-muted hover:text-text-secondary"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
+          {/* Tab bar */}
+          <div className="shrink-0 border-b border-bg-border bg-bg-base flex">
+            <button onClick={() => setActiveTab("analysis")}
+              className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
+                activeTab === "analysis" ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
+              }`}>
+              Analysis
+            </button>
+            <button onClick={() => { setActiveTab("changes"); setSelectedIdx(null); }}
+              className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
+                activeTab === "changes" ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
+              }`}>
+              Changes · {allPassages.length}
+            </button>
+          </div>
 
-            {/* Filing type selector — right side of filter bar, Pro-gated */}
-            {!isHistorical && (
-              <div className="ml-auto flex items-center border-l border-bg-border px-3 gap-1 shrink-0">
-                <button
-                  onClick={() => switchFilingType("10-K")}
-                  className={`font-mono text-[10px] px-2.5 py-1 rounded border uppercase tracking-wider transition-colors duration-150 ${
-                    filingType === "10-K"
-                      ? "border-accent text-accent bg-accent/10"
-                      : "border-transparent text-text-muted hover:text-text-secondary"
-                  }`}
-                >
-                  10-K
-                </button>
-                <button
-                  onClick={() => switchFilingType("10-Q")}
-                  title={plan === "free" ? "10-Q diffs require Pro" : undefined}
-                  className={`font-mono text-[10px] px-2.5 py-1 rounded border uppercase tracking-wider transition-colors duration-150 flex items-center gap-1 ${
-                    filingType === "10-Q"
-                      ? "border-accent text-accent bg-accent/10"
-                      : plan === "free"
-                        ? "border-transparent text-text-muted/50 cursor-pointer hover:text-accent hover:border-accent/40"
-                        : "border-transparent text-text-muted hover:text-text-secondary"
-                  }`}
-                >
-                  10-Q
-                  {plan === "free" && (
-                    <span className="text-[8px] font-bold text-accent/70 uppercase tracking-wider leading-none">Pro</span>
+          {/* Content */}
+          {activeTab === "analysis" ? (
+            <AnalysisPanel
+              data={data}
+              allPassages={allPassages}
+              highPassages={highPassages}
+              plan={plan}
+              watching={watching}
+              watchLoading={watchLoading}
+              onToggleWatch={toggleWatch}
+              onBrowseChanges={() => setActiveTab("changes")}
+              onSelectPassage={selectPassageFromAnalysis}
+            />
+          ) : (
+            <>
+              {/* Filter bar */}
+              <div className="shrink-0 border-b border-bg-border bg-bg-base flex overflow-x-auto">
+                {(["all", "high", "item_1a", "item_7", "item_3"] as SectionFilter[]).map((f) => {
+                  const count = f === "all" ? allPassages.length : f === "high" ? highPassages.length : (sectionCounts[f] ?? 0);
+                  if (f !== "all" && f !== "high" && count === 0) return null;
+                  if (f === "high" && highPassages.length === 0) return null;
+                  const label = f === "all" ? `All (${count})` : f === "high" ? `High (${count})` : `Item ${SECTION_SHORT[f]} (${count})`;
+                  return (
+                    <button key={f} onClick={() => { setFilter(f); setSelectedIdx(null); }}
+                      className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
+                        filter === f ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
+                      }`}>
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Two-panel layout */}
+              <div className="flex flex-1 overflow-hidden">
+                {/* Left: passage list (hidden on mobile when detail is open) */}
+                <div className={`overflow-y-auto bg-bg-base md:w-72 md:shrink-0 md:border-r md:border-bg-border ${
+                  selected !== null ? "hidden md:block" : "flex-1 md:flex-none"
+                }`}>
+                  {filtered.length === 0 ? (
+                    <div className="px-4 py-8 text-center"><p className="text-xs text-text-muted">No changes</p></div>
+                  ) : (
+                    filtered.map((p, i) => (
+                      <PassageRow key={i} passage={p} isSelected={i === selectedIdx}
+                        onClick={() => setSelectedIdx(i)}
+                        rowRef={i === selectedIdx ? selectedRowRef : undefined}
+                      />
+                    ))
                   )}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Two-panel layout — responsive */}
-          <div className="flex flex-1 overflow-hidden">
-            {/* Left: passage list */}
-            <div className={`overflow-y-auto bg-bg-base md:w-72 md:shrink-0 md:border-r md:border-bg-border md:block ${listVisible ? "flex-1" : "hidden"}`}>
-              {/* Mobile header: back to overview */}
-              <div className="md:hidden flex items-center px-4 py-2.5 border-b border-bg-border bg-bg-surface gap-3">
-                <button
-                  onClick={() => setMobileView("overview")}
-                  className="text-xs font-medium text-accent"
-                >
-                  ← Overview
-                </button>
-                <span className="font-mono text-[10px] text-text-muted ml-auto">
-                  {filtered.length} passages
-                </span>
-              </div>
-              {filtered.length === 0 ? (
-                <div className="px-4 py-8 text-center">
-                  <p className="text-xs text-text-muted">No changes</p>
                 </div>
-              ) : (
-                filtered.map((p, i) => (
-                  <PassageRow
-                    key={i}
-                    passage={p}
-                    isSelected={i === selectedIdx}
-                    onClick={() => selectPassage(i, "list")}
-                    rowRef={i === selectedIdx ? selectedRowRef : undefined}
-                  />
-                ))
-              )}
-            </div>
 
-            {/* Right: briefing or detail */}
-            <div className={`overflow-y-auto md:flex-1 md:block ${rightVisible ? "flex-1" : "hidden"}`}>
-              {selected !== null ? (
-                <PassageDetail
-                  key={selectedIdx ?? 0}
-                  passage={selected}
-                  onBack={() => {
-                    setSelectedIdx(null);
-                    setMobileView(prevMobileView);
-                  }}
-                  isPro={plan !== "free"}
-                />
-              ) : (
-                <BriefingPanel
-                  data={data}
-                  passages={allPassages}
-                  highPassages={highPassages}
-                  totalPassages={allPassages.length}
-                  onSelectPassage={(idx) => {
-                    selectPassage(idx, "overview");
-                    setFilter("all");
-                  }}
-                  onShowList={() => setMobileView("list")}
-                  plan={plan}
-                  watching={watching}
-                  watchLoading={watchLoading}
-                  onToggleWatch={toggleWatch}
-                />
-              )}
-            </div>
-          </div>
+                {/* Right: passage detail or empty state */}
+                <div className={`overflow-y-auto md:flex-1 ${selected !== null ? "flex-1" : "hidden md:flex md:items-center md:justify-center"}`}>
+                  {selected !== null ? (
+                    <PassageDetail
+                      key={selectedIdx ?? 0}
+                      passage={selected}
+                      onBack={() => setSelectedIdx(null)}
+                      isPro={plan !== "free"}
+                    />
+                  ) : (
+                    <p className="text-xs text-text-muted text-center px-4">
+                      Select a change to view details · ↑ ↓ to navigate
+                    </p>
+                  )}
+                </div>
+              </div>
+            </>
+          )}
         </>
       )}
 
@@ -949,12 +905,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               ? `${ticker} doesn't have at least two comparable filings on SEC EDGAR. Foreign companies (e.g. Chinese ADRs) file 20-F instead of 10-K — we try both automatically, but ${ticker} may have too few filings or list under a different ticker.`
               : data.error}
           </p>
-          <button
-            onClick={() => window.history.back()}
-            className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
-          >
-            Go back
-          </button>
+          <button onClick={() => window.history.back()} className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors">Go back</button>
         </div>
       )}
     </div>
