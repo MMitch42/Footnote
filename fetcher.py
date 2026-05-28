@@ -30,9 +30,27 @@ def extract_sections(filing) -> dict:
     """
     Extract Item 1A, 7, and 3 text from a filing object.
     Returns a dict with section text and filing metadata.
+
+    Form-specific notes:
+    - 10-K / 20-F: sections are embedded inline → use standard attributes.
+    - 40-F (Canadian MJDS filers): substantive content lives in attached exhibits.
+        risk_factors  → stub pointer; use aif_text (Annual Information Form, ~150K chars).
+        management_discussion → empty; use mda_text if attached, else blank.
+        legal_proceedings → works directly.
     """
     time.sleep(RATE_LIMIT_DELAY)
     doc = filing.obj()
+
+    if type(doc).__name__ == "FortyF":
+        return {
+            "filing_date": str(filing.filing_date),
+            "accession_number": str(filing.accession_number),
+            # AIF contains the full annual narrative including risk factors
+            "item_1a": _to_str(getattr(doc, "aif_text", None)),
+            # MD&A may be filed as a separate exhibit; empty if not present
+            "item_7": _to_str(getattr(doc, "mda_text", None)),
+            "item_3": _to_str(getattr(doc, "legal_proceedings", None)),
+        }
 
     return {
         "filing_date": str(filing.filing_date),

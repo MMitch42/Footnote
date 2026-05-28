@@ -946,7 +946,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           <p className="text-sm font-semibold text-text-primary">No filings found for {ticker}</p>
           <p className="text-xs text-text-muted max-w-sm leading-relaxed">
             {data.error.includes("fewer than 2")
-              ? `${ticker} doesn't have enough filings on SEC EDGAR to generate a diff. This usually means the company recently went public or filed under a different ticker.`
+              ? `${ticker} doesn't have at least two comparable filings on SEC EDGAR. Foreign companies (e.g. Chinese ADRs) file 20-F instead of 10-K — we try both automatically, but ${ticker} may have too few filings or list under a different ticker.`
               : data.error}
           </p>
           <button
