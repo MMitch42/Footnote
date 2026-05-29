@@ -172,7 +172,7 @@ function AnalysisPanel({
   data, allPassages, highPassages, plan,
   watching, watchLoading, onToggleWatch,
   onBrowseChanges, onSelectPassage,
-  unscoredCount, scoringMore, onScoreMore,
+  unscoredCount, scoringMore,
 }: {
   data: DiffResult;
   allPassages: Passage[];
