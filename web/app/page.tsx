@@ -76,18 +76,18 @@ export default function Home() {
     return () => clearInterval(id);
   }, []);
 
-  // Counter for 188bps
+  // Counter for 22% stat
   const { ref: statsRef, inView: statsInView } = useInView();
-  const [bps, setBps] = useState(0);
+  const [pct, setPct] = useState(0);
   useEffect(() => {
     if (!statsInView) return;
-    const TARGET = 188;
-    const DURATION = 1000;
+    const TARGET = 22;
+    const DURATION = 900;
     const start = performance.now();
     const frame = (now: number) => {
       const t = Math.min((now - start) / DURATION, 1);
       const ease = 1 - Math.pow(1 - t, 3);
-      setBps(Math.round(ease * TARGET));
+      setPct(Math.round(ease * TARGET));
       if (t < 1) requestAnimationFrame(frame);
     };
     requestAnimationFrame(frame);
@@ -294,18 +294,18 @@ export default function Home() {
         <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10">
           <div>
             <p className="font-mono text-5xl font-bold text-text-primary mb-1 tabular-nums">
-              {bps}<span className="text-accent">bps</span>
+              {pct}<span className="text-accent">%</span>
             </p>
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-4">per month, documented alpha</p>
+            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-4">annual alpha, peer-reviewed</p>
             <p className="text-sm text-text-secondary leading-relaxed">
-              Monthly alpha from SEC filing language changes, documented in peer-reviewed research.
+              Abnormal return from a long-short strategy on SEC filing language changes, documented in the Journal of Finance.
             </p>
           </div>
           <div className="pt-10 sm:pt-0 border-t border-bg-border sm:border-t-0 sm:border-l sm:pl-10">
             <p className="text-sm text-text-secondary leading-relaxed">
-              Cohen, Malloy &amp; Nguyen (Journal of Finance, 2020): companies that change their 10-K
-              language underperform by 22% annually. Institutional research platforms charge up to
-              $15,000/year for this signal.
+              Cohen, Malloy &amp; Nguyen (2020): companies that quietly rewrite their 10-K language
+              signal future underperformance. Institutional platforms charge up to $15,000/year
+              to monitor this. Footnote delivers the same signal at $9/month.
             </p>
             <div className="mt-6 space-y-3">
               <div>

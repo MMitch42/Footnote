@@ -4,7 +4,22 @@ export const runtime = "edge";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default function Image() {
+async function loadCursiveFont(): Promise<ArrayBuffer | null> {
+  try {
+    const css = await fetch(
+      "https://fonts.googleapis.com/css?family=Dancing+Script:700"
+    ).then((r) => r.text());
+    const url = css.match(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/)?.[1];
+    if (!url) return null;
+    return fetch(url).then((r) => r.arrayBuffer());
+  } catch {
+    return null;
+  }
+}
+
+export default async function Image() {
+  const fontData = await loadCursiveFont();
+
   return new ImageResponse(
     (
       <div
@@ -55,35 +70,23 @@ export default function Image() {
           <div
             style={{
               display: "flex",
-              alignItems: "baseline",
+              alignItems: "center",
               gap: 0,
               marginBottom: 32,
             }}
           >
             <span
               style={{
-                fontSize: 28,
-                color: "#f59e0b",
-                fontWeight: 800,
-                letterSpacing: "-1px",
-                fontFamily: "ui-monospace, monospace",
-                display: "flex",
-              }}
-            >
-              FN
-            </span>
-            <span
-              style={{
-                fontSize: 14,
+                fontSize: 32,
                 color: "#f59e0b",
                 fontWeight: 700,
-                opacity: 0.7,
-                marginBottom: 10,
-                marginLeft: 1,
+                fontFamily: fontData ? "'Dancing Script'" : "serif",
+                lineHeight: 1,
+                marginTop: 6,
                 display: "flex",
               }}
             >
-              ¹
+              fn
             </span>
             <span
               style={{
@@ -91,9 +94,8 @@ export default function Image() {
                 color: "#888",
                 letterSpacing: "0.25em",
                 fontWeight: 500,
-                marginLeft: 12,
-                alignSelf: "flex-end",
-                marginBottom: 3,
+                marginLeft: 14,
+                fontFamily: "ui-monospace, monospace",
                 display: "flex",
               }}
             >
@@ -229,6 +231,10 @@ export default function Image() {
         </div>
       </div>
     ),
-    { width: 1200, height: 630 }
+    {
+      width: 1200,
+      height: 630,
+      ...(fontData ? { fonts: [{ name: "Dancing Script", data: fontData, weight: 700 as const }] } : {}),
+    }
   );
 }

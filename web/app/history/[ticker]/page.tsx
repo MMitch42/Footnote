@@ -214,9 +214,9 @@ export default function HistoryPage({ params }: { params: Promise<{ ticker: stri
       .catch(() => setPlan("free"));
   }, []);
 
-  // Redirect non-Research users
+  // Redirect free users — Pro and Research both have access
   useEffect(() => {
-    if (plan !== null && plan !== "research") {
+    if (plan !== null && plan !== "pro" && plan !== "research") {
       router.replace("/upgrade");
     }
   }, [plan, router]);

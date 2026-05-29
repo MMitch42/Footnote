@@ -873,7 +873,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 }`}>
                 {watchLoading ? "…" : watching ? "★ Watching" : "☆ Watch"}
               </button>
-              {plan === "research" && (
+              {(plan === "pro" || plan === "research") && (
                 <Link href={`/history/${ticker}`} className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">History</Link>
               )}
               <Link href="/watchlist" className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">Watchlist</Link>
@@ -1046,8 +1046,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
             );
           })()}
 
-          {/* Tab bar */}
-          <div className="shrink-0 border-b border-bg-border bg-bg-base flex">
+          {/* Tab bar — mobile only; desktop shows both panels side-by-side */}
+          <div className="md:hidden shrink-0 border-b border-bg-border bg-bg-base flex">
             <button onClick={() => setActiveTab("analysis")}
               className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
                 activeTab === "analysis" ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
@@ -1062,24 +1062,31 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
             </button>
           </div>
 
-          {/* Content */}
-          {activeTab === "analysis" ? (
-            <AnalysisPanel
-              data={data}
-              allPassages={allPassages}
-              highPassages={highPassages}
-              plan={plan}
-              watching={watching}
-              watchLoading={watchLoading}
-              onToggleWatch={toggleWatch}
-              onBrowseChanges={() => setActiveTab("changes")}
-              onSelectPassage={selectPassageFromAnalysis}
-              unscoredCount={unscoredCount}
-              scoringMore={scoringMore}
-              onScoreMore={scoreMore}
-            />
-          ) : (
-            <>
+          {/* Content — side-by-side on desktop, tabbed on mobile */}
+          <div className="flex flex-1 overflow-hidden">
+
+            {/* Left: Analysis panel — always visible on desktop, tab-gated on mobile */}
+            <div className={`md:flex md:flex-col md:w-[360px] md:flex-none md:border-r md:border-bg-border
+              ${activeTab === "analysis" ? "flex flex-col flex-1" : "hidden"}`}>
+              <AnalysisPanel
+                data={data}
+                allPassages={allPassages}
+                highPassages={highPassages}
+                plan={plan}
+                watching={watching}
+                watchLoading={watchLoading}
+                onToggleWatch={toggleWatch}
+                onBrowseChanges={() => { setActiveTab("changes"); setSelectedIdx(null); }}
+                onSelectPassage={selectPassageFromAnalysis}
+                unscoredCount={unscoredCount}
+                scoringMore={scoringMore}
+                onScoreMore={scoreMore}
+              />
+            </div>
+
+            {/* Right: Changes panel — always visible on desktop, tab-gated on mobile */}
+            <div className={`flex-1 overflow-hidden flex flex-col ${activeTab === "changes" ? "" : "hidden md:flex"}`}>
+
               {/* Filter bar */}
               <div className="shrink-0 border-b border-bg-border bg-bg-base flex overflow-x-auto">
                 {(["all", "high", "item_1a", "item_7", "item_3"] as SectionFilter[]).map((f) => {
@@ -1098,10 +1105,10 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 })}
               </div>
 
-              {/* Two-panel layout */}
+              {/* Passage list + detail */}
               <div className="flex flex-1 overflow-hidden">
-                {/* Left: passage list (hidden on mobile when detail is open) */}
-                <div className={`overflow-y-auto bg-bg-base md:w-72 md:shrink-0 md:border-r md:border-bg-border ${
+                {/* Passage list */}
+                <div className={`overflow-y-auto bg-bg-base md:w-64 md:shrink-0 md:border-r md:border-bg-border ${
                   selected !== null ? "hidden md:block" : "flex-1 md:flex-none"
                 }`}>
                   {filtered.length === 0 ? (
@@ -1114,7 +1121,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                       />
                     ))
                   )}
-                  {/* Score-more banner at bottom of list */}
                   {unscoredCount > 0 && (
                     <div className="px-3 py-3 border-t border-bg-border bg-bg-surface">
                       <p className="text-[11px] text-text-muted mb-2">
@@ -1128,15 +1134,14 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                   )}
                 </div>
 
-                {/* Right: passage detail or empty state */}
+                {/* Passage detail */}
                 <div className={`overflow-y-auto md:flex-1 ${selected !== null ? "flex-1" : "hidden md:flex md:items-center md:justify-center"}`}>
                   {selected !== null ? (
                     <PassageDetail
                       key={selectedIdx ?? 0}
                       passage={selected}
                       onBack={() => setSelectedIdx(null)}
-                      isPro={plan !== "free"}
-                    />
+                      isPro={plan !== "free"} />
                   ) : (
                     <p className="text-xs text-text-muted text-center px-4">
                       Select a change to view details · ↑ ↓ to navigate
@@ -1144,8 +1149,9 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                   )}
                 </div>
               </div>
-            </>
-          )}
+
+            </div>
+          </div>
         </>
       )}
 

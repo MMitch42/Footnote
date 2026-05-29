@@ -36,10 +36,12 @@ export default async function AppleIcon() {
         <span
           style={{
             color: "#f59e0b",
-            fontSize: 88,
+            fontSize: 82,
             fontWeight: 700,
             fontFamily: fontData ? "'Dancing Script'" : "serif",
             lineHeight: 1,
+            marginTop: 14,
+            marginLeft: 4,
           }}
         >
           fn

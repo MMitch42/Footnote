@@ -19,6 +19,7 @@ const PRO_FEATURES = [
   "Full synthesis report — executive summary, concerns & reassurances",
   "Management sentiment analysis",
   "Performance implications analysis",
+  "Historical filing timeline — explore any year, any company",
   "Email alerts when filings change (adjustable threshold)",
   "Weekly digest (opt-in)",
 ];

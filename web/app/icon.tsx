@@ -36,10 +36,12 @@ export default async function Icon() {
         <span
           style={{
             color: "#f59e0b",
-            fontSize: 17,
+            fontSize: 16,
             fontWeight: 700,
             fontFamily: fontData ? "'Dancing Script'" : "serif",
             lineHeight: 1,
+            marginTop: 3,
+            marginLeft: 1,
           }}
         >
           fn
