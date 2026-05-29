@@ -438,30 +438,46 @@ function AnalysisPanel({
 
         {/* Ongoing background scoring indicator / manual retry */}
         {(unscoredCount > 0 || scoringMore) && (
-          <div className="flex items-center justify-between gap-3 py-1">
-            <div className="flex items-center gap-2">
-              {scoringMore ? (
-                <div className="flex gap-1">
-                  {[0,1,2].map((i) => (
-                    <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                  ))}
-                </div>
-              ) : (
-                <div className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
-              )}
-              <p className="text-xs text-text-muted">
-                {scoringMore
-                  ? `Analyzing ${unscoredCount} more change${unscoredCount !== 1 ? "s" : ""}…`
-                  : `${unscoredCount} change${unscoredCount !== 1 ? "s" : ""} pending analysis`}
+          unscoredCount > 120 && !scoringMore ? (
+            // Large backlog — show a more prominent card so user knows they can request it
+            <div className="rounded-lg border border-bg-border bg-bg-raised p-4">
+              <p className="text-sm font-semibold text-text-primary mb-1">
+                {unscoredCount} more changes not yet scored
               </p>
-            </div>
-            {!scoringMore && (
+              <p className="text-xs text-text-muted leading-relaxed mb-3">
+                This filing is large. Scoring may take a minute or two.
+              </p>
               <button onClick={onScoreMore}
-                className="text-xs font-medium text-accent hover:text-accent-bright transition-colors shrink-0">
-                Analyze now
+                className="text-xs font-semibold px-3 py-2 rounded-lg bg-accent text-bg-base hover:bg-accent-bright transition-colors">
+                Score all {unscoredCount} changes
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between gap-3 py-1">
+              <div className="flex items-center gap-2">
+                {scoringMore ? (
+                  <div className="flex gap-1">
+                    {[0,1,2].map((i) => (
+                      <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
+                )}
+                <p className="text-xs text-text-muted">
+                  {scoringMore
+                    ? `Analyzing ${unscoredCount} more change${unscoredCount !== 1 ? "s" : ""}…`
+                    : `${unscoredCount} change${unscoredCount !== 1 ? "s" : ""} pending analysis`}
+                </p>
+              </div>
+              {!scoringMore && (
+                <button onClick={onScoreMore}
+                  className="text-xs font-medium text-accent hover:text-accent-bright transition-colors shrink-0">
+                  Analyze now
+                </button>
+              )}
+            </div>
+          )
         )}
 
       </div>
@@ -707,9 +723,12 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     }).catch(() => {});
   }, [ticker]);
 
-  // Auto-score remaining passages in the background once initial load finishes
+  // Auto-score remaining passages — only when backlog is small enough to complete within timeout.
+  // Large filings (>120 unscored) would exceed the 120s route timeout; let the user trigger manually.
+  const AUTO_SCORE_THRESHOLD = 120;
   useEffect(() => {
     if (!data || data.error || loading || scoringMore || unscoredCount === 0) return;
+    if (unscoredCount > AUTO_SCORE_THRESHOLD) return;
     const key = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
     if (autoScoredRef.current.has(key)) return;
     autoScoredRef.current.add(key);
@@ -905,8 +924,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           {/* Skeleton content — mirrors real three-column layout */}
           <div className="flex flex-1 overflow-hidden">
 
-            {/* Analysis skeleton — full width mobile, 360px left column desktop */}
-            <div className="flex flex-col flex-1 md:flex-none md:w-[360px] md:border-r md:border-bg-border overflow-y-auto">
+            {/* Analysis skeleton — full width mobile, 1/3 left column desktop */}
+            <div className="flex flex-col flex-1 md:flex-none md:w-1/3 md:border-r md:border-bg-border overflow-y-auto">
               <div className="p-4 sm:p-6 space-y-7">
 
                 {/* Verdict + stats */}
@@ -1096,7 +1115,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           <div className="flex flex-1 overflow-hidden">
 
             {/* Left: Analysis panel — always visible on desktop, tab-gated on mobile */}
-            <div className={`md:w-[360px] md:border-r md:border-bg-border ${
+            <div className={`md:w-1/3 md:border-r md:border-bg-border ${
               activeTab === "analysis"
                 ? "flex flex-col flex-1 md:flex-none"
                 : "hidden md:flex md:flex-col md:flex-none"
@@ -1200,9 +1219,9 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
         </div>
       )}
 
-      {/* Persistent disclaimer — always visible, never requires scrolling */}
-      <div className="shrink-0 border-t border-bg-border/40 px-6 py-1 bg-bg-base">
-        <p className="text-[10px] text-text-muted/60 text-center">Not financial advice. For informational purposes only.</p>
+      {/* Disclaimer — always visible; layout.tsx's global one is clipped by h-screen overflow-hidden */}
+      <div className="shrink-0 px-6 py-1.5 text-center">
+        <p className="text-[10px] text-text-muted/50">Not financial advice. For informational purposes only.</p>
       </div>
     </div>
   );

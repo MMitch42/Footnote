@@ -1,6 +1,7 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
+import Script from "next/script";
 import { ChatWidget } from "@/components/ChatWidget";
 import { FeatureLauncher } from "@/components/FeatureLauncher";
 import "./globals.css";
@@ -14,6 +15,11 @@ const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "Footnote | SEC Filing Intelligence",
@@ -53,6 +59,18 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} h-full`}
       >
         <body className="min-h-full flex flex-col bg-bg-base text-text-primary antialiased">
+          <Script
+            src="https://www.googletagmanager.com/gtag/js?id=G-BG7H9ME68C"
+            strategy="afterInteractive"
+          />
+          <Script id="gtag-init" strategy="afterInteractive">
+            {`
+              window.dataLayer = window.dataLayer || [];
+              function gtag(){dataLayer.push(arguments);}
+              gtag('js', new Date());
+              gtag('config', 'G-BG7H9ME68C');
+            `}
+          </Script>
           {children}
           <FeatureLauncher />
           <ChatWidget />

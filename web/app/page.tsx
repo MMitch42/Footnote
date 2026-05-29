@@ -298,10 +298,10 @@ export default function Home() {
             </p>
             <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-4">annual alpha, peer-reviewed</p>
             <p className="text-sm text-text-secondary leading-relaxed mb-3">
-              A long-short strategy on 10-K language changes generates ~22% annual abnormal return — companies that quietly rewrite their filings significantly underperform those that don&apos;t.
+              A long-short strategy on 10-K language changes generates ~22% annual abnormal return. Companies that quietly rewrite their filings significantly underperform those that don&apos;t.
             </p>
             <p className="text-xs text-text-muted leading-relaxed">
-              Cohen, Malloy &amp; Nguyen — &ldquo;Lazy Prices,&rdquo; <em>Journal of Finance</em>, 2020.
+              Cohen, Malloy &amp; Nguyen, &ldquo;Lazy Prices,&rdquo; <em>Journal of Finance</em>, 2020.
               Institutional research platforms charge up to $15,000/year for this signal.
             </p>
           </div>
@@ -314,7 +314,7 @@ export default function Home() {
                   <span className="text-sm text-text-secondary mb-1">/month</span>
                   <span className="text-sm text-text-secondary line-through mb-1">$29</span>
                 </div>
-                <p className="text-xs font-semibold text-accent">Early access — locked in for life.</p>
+                <p className="text-xs font-semibold text-accent">Early access. Locked in for life.</p>
               </div>
               <a
                 href="/upgrade"
