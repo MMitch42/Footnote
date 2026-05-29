@@ -612,6 +612,11 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   // Track which diffs we've already auto-scored so we don't loop
   const autoScoredRef = useRef<Set<string>>(new Set());
 
+  // Draggable split between Analysis and Changes panels (desktop only)
+  const [splitPct, setSplitPct] = useState(33);
+  const panelContainerRef = useRef<HTMLDivElement>(null);
+  const isDraggingSplit = useRef(false);
+
   // Fetch diff data — check module-level cache first
   useEffect(() => {
     const cacheKey = buildCacheKey(ticker, filingType, dateNew, dateOld);
@@ -874,6 +879,24 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     setSelectedIdx(idx);
   };
 
+  const handleSplitMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingSplit.current = true;
+    const onMove = (e: MouseEvent) => {
+      if (!isDraggingSplit.current || !panelContainerRef.current) return;
+      const rect = panelContainerRef.current.getBoundingClientRect();
+      const pct = ((e.clientX - rect.left) / rect.width) * 100;
+      setSplitPct(Math.min(60, Math.max(20, pct)));
+    };
+    const onUp = () => {
+      isDraggingSplit.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
+
   const companyDisplay = data?.company_name && data.company_name !== ticker.toUpperCase()
     ? `${data.company_name} (${data.ticker})`
     : (data?.ticker ?? ticker.toUpperCase());
@@ -903,9 +926,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 }`}>
                 {watchLoading ? "…" : watching ? "★ Watching" : "☆ Watch"}
               </button>
-              {(plan === "pro" || plan === "research") && (
-                <Link href={`/history/${ticker}`} className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">History</Link>
-              )}
               <Link href="/watchlist" className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">Watchlist</Link>
               {plan === "free" && (
                 <a href="/upgrade" className="text-xs font-semibold px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap">
@@ -1065,9 +1085,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
         <>
           {/* Filing header */}
           <div className="shrink-0 px-4 sm:px-6 py-2.5 border-b border-bg-border bg-bg-surface flex items-center gap-3 overflow-x-auto">
-            {isHistorical && (
-              <Link href={`/history/${ticker}`} className="text-xs text-text-muted hover:text-accent transition-colors duration-150 shrink-0 mr-1">← History</Link>
-            )}
             <span className="text-sm font-semibold text-text-primary shrink-0">{companyDisplay}</span>
             <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase tracking-wider shrink-0">{data.filing_type}</span>
             <div className="flex items-center gap-2 font-mono text-xs shrink-0">
@@ -1127,14 +1144,17 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           </div>
 
           {/* Content — side-by-side on desktop, tabbed on mobile */}
-          <div className="flex flex-1 overflow-hidden">
+          <div ref={panelContainerRef} className="flex flex-1 overflow-hidden">
 
             {/* Left: Analysis panel — always visible on desktop, tab-gated on mobile */}
-            <div className={`md:w-1/3 md:border-r md:border-bg-border ${
-              activeTab === "analysis"
-                ? "flex flex-col flex-1 md:flex-none"
-                : "hidden md:flex md:flex-col md:flex-none"
-            }`}>
+            <div
+              className={`md:border-r md:border-bg-border ${
+                activeTab === "analysis"
+                  ? "flex flex-col flex-1 md:flex-none"
+                  : "hidden md:flex md:flex-col md:flex-none"
+              }`}
+              style={{ width: `${splitPct}%` }}
+            >
               <AnalysisPanel
                 data={data}
                 allPassages={allPassages}
@@ -1148,6 +1168,15 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 unscoredCount={unscoredCount}
                 scoringMore={scoringMore}
               />
+            </div>
+
+            {/* Drag divider — desktop only */}
+            <div
+              onMouseDown={handleSplitMouseDown}
+              className="hidden md:flex w-1 shrink-0 cursor-col-resize items-center justify-center group hover:bg-accent/20 transition-colors duration-100 z-10"
+              title="Drag to resize"
+            >
+              <div className="w-px h-full bg-bg-border group-hover:bg-accent/40 transition-colors" />
             </div>
 
             {/* Right: Changes panel — always visible on desktop, tab-gated on mobile */}

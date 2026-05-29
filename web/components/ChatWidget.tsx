@@ -28,13 +28,37 @@ export function ChatWidget() {
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
   const [diffCtx, setDiffCtx] = useState<DiffContextData | null>(getDiffContext);
+  const [chatHeight, setChatHeight] = useState(520);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const isDraggingChat = useRef(false);
+  const dragStartY = useRef(0);
+  const dragStartHeight = useRef(0);
   const { isSignedIn, isLoaded } = useUser();
   const pathname = usePathname();
 
   // Keep local diffCtx in sync with the store
   useEffect(() => subscribeDiffContext(() => setDiffCtx(getDiffContext())), []);
+
+  // Drag-to-resize the chat panel (drag handle on top edge)
+  const handleResizeMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isDraggingChat.current = true;
+    dragStartY.current = e.clientY;
+    dragStartHeight.current = chatHeight;
+    const onMove = (e: MouseEvent) => {
+      if (!isDraggingChat.current) return;
+      const delta = dragStartY.current - e.clientY; // drag up = taller
+      setChatHeight(Math.min(780, Math.max(260, dragStartHeight.current + delta)));
+    };
+    const onUp = () => {
+      isDraggingChat.current = false;
+      document.removeEventListener("mousemove", onMove);
+      document.removeEventListener("mouseup", onUp);
+    };
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
+  };
 
   // Extract ticker from URL (fallback when diff hasn't loaded yet)
   const tickerMatch = pathname.match(/^\/diff\/([^/?]+)/);
@@ -107,7 +131,17 @@ export function ChatWidget() {
     <>
       {/* Panel */}
       {open && (
-        <div className="fixed bottom-[92px] right-3 w-[calc(100vw-24px)] sm:bottom-[152px] sm:right-24 sm:w-[370px] max-h-[520px] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden">
+        <div
+          className="fixed bottom-[92px] right-3 w-[calc(100vw-24px)] sm:bottom-[152px] sm:right-24 sm:w-[400px] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden"
+          style={{ height: chatHeight }}
+        >
+          {/* Drag-to-resize handle — top edge */}
+          <div
+            onMouseDown={handleResizeMouseDown}
+            className="absolute top-0 left-0 right-0 h-1.5 cursor-ns-resize z-10 group"
+          >
+            <div className="absolute inset-x-0 top-0 h-px bg-bg-border group-hover:bg-accent/40 transition-colors" />
+          </div>
 
           {/* Header */}
           <div className="shrink-0 px-4 py-2.5 border-b border-bg-border flex items-center justify-between bg-bg-raised">

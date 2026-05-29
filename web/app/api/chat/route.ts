@@ -16,11 +16,15 @@ You help users:
 - Assess why a change might be significant or routine for investors
 - Explain SEC terminology and disclosure categories (Risk Factors, MD&A, Legal Proceedings)
 
-When you have access to actual diff data (provided below), answer using that data directly — quote or reference specific passages rather than speaking in generalities. The user can already read the passages themselves; your value is connecting dots, explaining implications, and answering targeted searches across all the changes at once.
+FORMATTING: Write in plain prose only. No markdown whatsoever — no bullet points, no asterisks, no bold, no headers, no dashes as list markers. Just clean sentences and paragraphs. If you need to enumerate things, use "First... Second... Third..." or commas.
 
-Be concise and precise. Avoid jargon when simpler language works. Keep responses under 250 words unless the user explicitly asks for more detail.
+NAVIGATION: When the user asks to find, show, pull up, or navigate to a specific change, you MUST append [SHOW:N] on its own at the very end of your response, where N is the passage number from the diff context. Pick the single most relevant passage. This is required — do not forget it when the user wants to view something. Example: if passage 3 is the most relevant, end with [SHOW:3].
 
-You are not a financial advisor. Do not recommend buying or selling any security or predict stock prices. If asked for investment advice, explain that you can help interpret filing language but cannot provide investment recommendations.`;
+When you have access to actual diff data (provided below), answer using that data directly. The user can already read the passages themselves; your value is connecting dots, explaining implications, and answering targeted searches across all the changes at once.
+
+Be concise and precise. Keep responses under 200 words unless the user explicitly asks for more detail.
+
+You are not a financial advisor. Do not recommend buying or selling any security or predict stock prices.`;
 
 const SECTION_FULL: Record<string, string> = {
   item_1a: "Risk Factors",
@@ -115,7 +119,7 @@ function buildDiffContextBlock(ctx: DiffContext): string {
       if (p.new) lines.push(`    ADDED: "${p.new}"`);
       lines.push("");
     });
-    lines.push("NAVIGATION: When the user asks to find, see, or show a specific passage, append [SHOW:N] at the very end of your response (after all text), where N is the passage number above. Only include [SHOW:N] when the user wants to view a particular change — not for general questions.");
+    lines.push("Passages are numbered [1] through [" + passages.length + "]. Use [SHOW:N] to navigate the user to the most relevant one when they ask to find or view something.");
     lines.push("");
   }
 

@@ -26,10 +26,6 @@ const PRO_FEATURES: Feature[] = [
     detail: "Concerns, reassurances, management sentiment, and business outlook synthesized from every change in the filing.",
   },
   {
-    label: "Historical filing timeline",
-    detail: "Diff any consecutive pair going back 10+ years. See exactly when language started shifting.",
-  },
-  {
     label: "10-Q quarterly diffs + word-level view",
     detail: "Track quarterly filings, not just annual 10-Ks. Inline word diff shows what changed within a passage.",
   },
