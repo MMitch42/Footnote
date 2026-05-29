@@ -297,24 +297,24 @@ export default function Home() {
               {pct}<span className="text-accent">%</span>
             </p>
             <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-4">annual alpha, peer-reviewed</p>
-            <p className="text-sm text-text-secondary leading-relaxed">
-              Abnormal return from a long-short strategy on SEC filing language changes, documented in the Journal of Finance.
+            <p className="text-sm text-text-secondary leading-relaxed mb-3">
+              A long-short strategy on 10-K language changes generates ~22% annual abnormal return — companies that quietly rewrite their filings significantly underperform those that don&apos;t.
+            </p>
+            <p className="text-xs text-text-muted leading-relaxed">
+              Cohen, Malloy &amp; Nguyen — &ldquo;Lazy Prices,&rdquo; <em>Journal of Finance</em>, 2020.
+              Institutional research platforms charge up to $15,000/year for this signal.
             </p>
           </div>
-          <div className="pt-10 sm:pt-0 border-t border-bg-border sm:border-t-0 sm:border-l sm:pl-10">
-            <p className="text-sm text-text-secondary leading-relaxed">
-              Cohen, Malloy &amp; Nguyen (2020): companies that quietly rewrite their 10-K language
-              signal future underperformance. Institutional platforms charge up to $15,000/year
-              to monitor this. Footnote delivers the same signal at $9/month.
-            </p>
-            <div className="mt-6 space-y-3">
+          <div className="pt-10 sm:pt-0 border-t border-bg-border sm:border-t-0 sm:border-l sm:pl-10 flex flex-col justify-center">
+            <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-4">Footnote Pro</p>
+            <div className="space-y-3">
               <div>
                 <div className="flex items-end gap-2 mb-1">
                   <span className="font-mono text-3xl font-bold text-text-primary">$9</span>
                   <span className="text-sm text-text-secondary mb-1">/month</span>
                   <span className="text-sm text-text-secondary line-through mb-1">$29</span>
                 </div>
-                <p className="text-xs font-semibold text-accent">Early access. Locked in for life.</p>
+                <p className="text-xs font-semibold text-accent">Early access — locked in for life.</p>
               </div>
               <a
                 href="/upgrade"
@@ -322,6 +322,9 @@ export default function Home() {
               >
                 Subscribe →
               </a>
+              <p className="text-xs text-text-muted leading-relaxed max-w-[200px]">
+                Full intelligence reports, unlimited watchlist, email alerts, and Footnote AI.
+              </p>
             </div>
           </div>
         </div>

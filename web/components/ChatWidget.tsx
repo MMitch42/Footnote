@@ -147,14 +147,26 @@ export function ChatWidget() {
               </a>
             </div>
           ) : plan === "free" ? (
-            <div className="flex-1 flex flex-col items-center justify-center px-6 text-center gap-3 py-10">
-              <p className="text-sm font-semibold text-text-primary mb-1">Pro feature</p>
-              <p className="text-xs text-text-muted leading-relaxed max-w-[260px]">
-                Ask questions about any filing, get plain-language explanations of SEC disclosures, and more.
-              </p>
+            <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-4">
+              <div>
+                <p className="text-xs font-mono font-bold text-accent uppercase tracking-widest mb-1">Pro feature</p>
+                <p className="text-xs text-text-secondary leading-relaxed">
+                  Gemini reads the full diff and answers questions in plain English. Ask it to find, explain, or compare anything across the entire filing.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                {DIFF_SUGGESTIONS.map((s) => (
+                  <div
+                    key={s}
+                    className="w-full text-left text-xs px-3 py-2 rounded-lg border border-bg-border text-text-muted opacity-50 cursor-default select-none"
+                  >
+                    {s}
+                  </div>
+                ))}
+              </div>
               <a
                 href="/upgrade"
-                className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors mt-1"
+                className="text-xs font-semibold px-4 py-2.5 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors text-center mt-1"
               >
                 Upgrade to Pro →
               </a>

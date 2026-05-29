@@ -5,23 +5,37 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 
-const FREE_FEATURES = [
-  "Latest diff for any public company",
-  "Novelty scores on every language change",
-  "Risk Factors, MD&A, and Legal Proceedings sections",
-  "Basic analysis summary",
-  "Watchlist: up to 2 tickers",
+type Feature = { label: string; detail?: string };
+
+const FREE_FEATURES: Feature[] = [
+  { label: "Latest 10-K diff for any public company" },
+  { label: "Novelty scores on every changed passage (1–10)" },
+  { label: "Risk Factors, MD&A, and Legal Proceedings" },
+  { label: "Overview summary" },
+  { label: "Watchlist: up to 2 tickers" },
 ];
 
-const PRO_FEATURES = [
-  "Everything in Free",
-  "Unlimited watchlist",
-  "Full synthesis report — executive summary, concerns & reassurances",
-  "Management sentiment analysis",
-  "Performance implications analysis",
-  "Historical filing timeline — explore any year, any company",
-  "Email alerts when filings change (adjustable threshold)",
-  "Weekly digest (opt-in)",
+const PRO_FEATURES: Feature[] = [
+  { label: "Everything in Free" },
+  {
+    label: "Footnote AI",
+    detail: "Ask anything about the filing you're reading — find topic-specific changes, explain language shifts, or search across all passages at once in plain English.",
+  },
+  {
+    label: "Full intelligence report",
+    detail: "Executive summary, key concerns, reassurances, management sentiment, and business outlook — synthesized from every change in the filing.",
+  },
+  {
+    label: "Historical filing timeline",
+    detail: "Explore any consecutive filing pair going back 10+ years. Spot the exact year language started shifting.",
+  },
+  {
+    label: "10-Q quarterly diffs + word-level view",
+    detail: "Track language changes in quarterly filings, not just annual 10-Ks. Inline word diff shows exactly what was added or removed within a passage.",
+  },
+  { label: "Unlimited watchlist" },
+  { label: "Email alerts when filings change (adjustable threshold)" },
+  { label: "Weekly digest across your watchlist" },
 ];
 
 type Plan = "free" | "pro" | "research" | null;
@@ -112,9 +126,9 @@ export default function UpgradePage() {
 
             <ul className="space-y-2.5">
               {FREE_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-2.5">
+                <li key={f.label} className="flex items-start gap-2.5">
                   <span className="text-text-muted text-sm shrink-0 mt-0.5">✓</span>
-                  <span className="text-sm text-text-secondary leading-snug">{f}</span>
+                  <span className="text-sm text-text-secondary leading-snug">{f.label}</span>
                 </li>
               ))}
             </ul>
@@ -173,13 +187,18 @@ export default function UpgradePage() {
               </div>
             )}
 
-            <ul className="space-y-2.5">
+            <ul className="space-y-3">
               {PRO_FEATURES.map((f) => (
-                <li key={f} className="flex items-start gap-2.5">
+                <li key={f.label} className="flex items-start gap-2.5">
                   <span className="text-accent text-sm shrink-0 mt-0.5">✓</span>
-                  <span className={`text-sm leading-snug ${f === "Everything in Free" ? "text-text-muted" : "text-text-secondary"}`}>
-                    {f}
-                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className={`text-sm leading-snug ${f.label === "Everything in Free" ? "text-text-muted" : "text-text-secondary"}`}>
+                      {f.label}
+                    </span>
+                    {f.detail && (
+                      <p className="text-xs text-text-muted leading-relaxed">{f.detail}</p>
+                    )}
+                  </div>
                 </li>
               ))}
             </ul>

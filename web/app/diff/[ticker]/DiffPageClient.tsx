@@ -464,10 +464,6 @@ function AnalysisPanel({
           </div>
         )}
 
-        <p className="text-xs text-text-muted pb-2">
-          Not financial advice. For informational purposes only.
-        </p>
-
       </div>
     </div>
   );
@@ -896,8 +892,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
       {loading && (
         <>
-          {/* Skeleton tab bar */}
-          <div className="shrink-0 border-b border-bg-border bg-bg-base flex">
+          {/* Skeleton tab bar — mobile only */}
+          <div className="md:hidden shrink-0 border-b border-bg-border bg-bg-base flex">
             <div className="px-4 py-2.5 border-b-2 border-accent flex items-center">
               <div className="h-2.5 w-14 bg-bg-raised rounded animate-pulse" />
             </div>
@@ -906,85 +902,119 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
             </div>
           </div>
 
-          {/* Skeleton analysis panel */}
-          <div className="overflow-y-auto flex-1 min-h-0">
-            <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-7">
+          {/* Skeleton content — mirrors real three-column layout */}
+          <div className="flex flex-1 overflow-hidden">
 
-              {/* Verdict + stats */}
-              <div className="space-y-2 pt-1">
-                <div className="h-7 w-40 bg-bg-surface rounded animate-pulse" />
-                <div className="h-3 w-72 bg-bg-surface rounded animate-pulse opacity-60" />
-              </div>
+            {/* Analysis skeleton — full width mobile, 360px left column desktop */}
+            <div className="flex flex-col flex-1 md:flex-none md:w-[360px] md:border-r md:border-bg-border overflow-y-auto">
+              <div className="p-4 sm:p-6 space-y-7">
 
-              {/* Watch CTA */}
-              <div className="rounded-lg border border-bg-border bg-bg-raised p-4 flex items-center justify-between gap-4">
-                <div className="space-y-2 flex-1">
-                  <div className="h-3.5 w-36 bg-bg-surface rounded animate-pulse" />
-                  <div className="h-3 w-56 bg-bg-surface rounded animate-pulse opacity-60" />
+                {/* Verdict + stats */}
+                <div className="space-y-2 pt-1">
+                  <div className="h-7 w-40 bg-bg-surface rounded animate-pulse" />
+                  <div className="h-3 w-72 bg-bg-surface rounded animate-pulse opacity-60" />
                 </div>
-                <div className="h-8 w-20 bg-bg-surface rounded-lg animate-pulse shrink-0" />
-              </div>
 
-              {/* Sentiment */}
-              <div className="flex items-center gap-3">
-                <div className="h-3 w-28 bg-bg-surface rounded animate-pulse opacity-60" />
-                <div className="h-3 w-20 bg-bg-surface rounded animate-pulse" />
-              </div>
-
-              {/* Summary */}
-              <div className="space-y-2">
-                <div className="h-3 w-16 bg-bg-surface rounded animate-pulse opacity-60" />
-                <div className="pl-3 border-l-2 border-bg-border space-y-2">
-                  <div className="h-3 w-full bg-bg-surface rounded animate-pulse" />
-                  <div className="h-3 w-11/12 bg-bg-surface rounded animate-pulse" />
-                  <div className="h-3 w-4/5 bg-bg-surface rounded animate-pulse" />
-                  <div className="h-3 w-2/3 bg-bg-surface rounded animate-pulse opacity-60" />
+                {/* Watch CTA */}
+                <div className="rounded-lg border border-bg-border bg-bg-raised p-4 flex items-center justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="h-3.5 w-36 bg-bg-surface rounded animate-pulse" />
+                    <div className="h-3 w-56 bg-bg-surface rounded animate-pulse opacity-60" />
+                  </div>
+                  <div className="h-8 w-20 bg-bg-surface rounded-lg animate-pulse shrink-0" />
                 </div>
-              </div>
 
-              {/* Concerns */}
-              <div className="space-y-3">
-                <div className="h-3 w-24 bg-bg-surface rounded animate-pulse opacity-60" />
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="flex gap-3" style={{ opacity: 1 - i * 0.18 }}>
-                    <div className="w-1.5 h-1.5 rounded-full bg-bg-surface shrink-0 mt-1.5 animate-pulse" />
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="h-3 bg-bg-surface rounded animate-pulse" style={{ width: `${72 - i * 8}%` }} />
-                      <div className="h-2.5 w-full bg-bg-surface rounded animate-pulse opacity-50" />
-                    </div>
+                {/* Sentiment */}
+                <div className="flex items-center gap-3">
+                  <div className="h-3 w-28 bg-bg-surface rounded animate-pulse opacity-60" />
+                  <div className="h-3 w-20 bg-bg-surface rounded animate-pulse" />
+                </div>
+
+                {/* Summary */}
+                <div className="space-y-2">
+                  <div className="h-3 w-16 bg-bg-surface rounded animate-pulse opacity-60" />
+                  <div className="pl-3 border-l-2 border-bg-border space-y-2">
+                    <div className="h-3 w-full bg-bg-surface rounded animate-pulse" />
+                    <div className="h-3 w-11/12 bg-bg-surface rounded animate-pulse" />
+                    <div className="h-3 w-4/5 bg-bg-surface rounded animate-pulse" />
+                    <div className="h-3 w-2/3 bg-bg-surface rounded animate-pulse opacity-60" />
                   </div>
-                ))}
-              </div>
+                </div>
 
-              {/* Reassurances */}
-              <div className="space-y-3">
-                <div className="h-3 w-28 bg-bg-surface rounded animate-pulse opacity-60" />
-                {[0, 1].map((i) => (
-                  <div key={i} className="flex gap-3" style={{ opacity: 1 - i * 0.3 }}>
-                    <div className="w-1.5 h-1.5 rounded-full bg-bg-surface shrink-0 mt-1.5 animate-pulse" />
-                    <div className="space-y-1.5 flex-1 min-w-0">
-                      <div className="h-3 bg-bg-surface rounded animate-pulse" style={{ width: `${65 - i * 10}%` }} />
-                      <div className="h-2.5 w-full bg-bg-surface rounded animate-pulse opacity-50" />
+                {/* Concerns */}
+                <div className="space-y-3">
+                  <div className="h-3 w-24 bg-bg-surface rounded animate-pulse opacity-60" />
+                  {[0, 1, 2, 3].map((i) => (
+                    <div key={i} className="flex gap-3" style={{ opacity: 1 - i * 0.18 }}>
+                      <div className="w-1.5 h-1.5 rounded-full bg-bg-surface shrink-0 mt-1.5 animate-pulse" />
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="h-3 bg-bg-surface rounded animate-pulse" style={{ width: `${72 - i * 8}%` }} />
+                        <div className="h-2.5 w-full bg-bg-surface rounded animate-pulse opacity-50" />
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Status message */}
-              <div className="flex items-center gap-2 pt-2">
-                <div className="flex gap-1">
-                  {[0,1,2].map((i) => (
-                    <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
                   ))}
                 </div>
-                <p className="text-xs text-text-muted">
-                  {slowLoad
-                    ? "Still working — large filings can take up to a minute on first analysis."
-                    : `Analyzing ${ticker.toUpperCase()}… first run ~20–30s, subsequent loads instant.`}
-                </p>
-              </div>
 
+                {/* Reassurances */}
+                <div className="space-y-3">
+                  <div className="h-3 w-28 bg-bg-surface rounded animate-pulse opacity-60" />
+                  {[0, 1].map((i) => (
+                    <div key={i} className="flex gap-3" style={{ opacity: 1 - i * 0.3 }}>
+                      <div className="w-1.5 h-1.5 rounded-full bg-bg-surface shrink-0 mt-1.5 animate-pulse" />
+                      <div className="space-y-1.5 flex-1 min-w-0">
+                        <div className="h-3 bg-bg-surface rounded animate-pulse" style={{ width: `${65 - i * 10}%` }} />
+                        <div className="h-2.5 w-full bg-bg-surface rounded animate-pulse opacity-50" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Status message */}
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="flex gap-1">
+                    {[0,1,2].map((i) => (
+                      <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                    ))}
+                  </div>
+                  <p className="text-xs text-text-muted">
+                    {slowLoad
+                      ? "Still working — large filings can take up to a minute on first analysis."
+                      : `Analyzing ${ticker.toUpperCase()}… first run ~20–30s, subsequent loads instant.`}
+                  </p>
+                </div>
+
+              </div>
             </div>
+
+            {/* Right skeleton — desktop only */}
+            <div className="hidden md:flex flex-1 flex-col">
+              {/* Filter bar skeleton */}
+              <div className="shrink-0 border-b border-bg-border bg-bg-base flex items-center gap-4 px-4 py-2.5">
+                {[40, 32, 44, 40, 40].map((w, i) => (
+                  <div key={i} className="h-3 bg-bg-surface rounded animate-pulse" style={{ width: w, opacity: i === 0 ? 1 : 0.4 }} />
+                ))}
+              </div>
+              {/* Passage list + detail */}
+              <div className="flex flex-1 overflow-hidden">
+                {/* Passage list skeleton */}
+                <div className="w-64 shrink-0 border-r border-bg-border overflow-y-auto">
+                  {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
+                    <div key={i} className="px-3 py-2.5 border-b border-bg-border flex flex-col gap-1.5" style={{ opacity: 1 - i * 0.09 }}>
+                      <div className="flex items-center gap-2">
+                        <div className="w-1.5 h-1.5 rounded-full bg-bg-surface animate-pulse shrink-0" />
+                        <div className="h-3 w-14 bg-bg-surface rounded animate-pulse" />
+                      </div>
+                      <div className="h-2.5 bg-bg-surface rounded animate-pulse opacity-50" style={{ width: `${78 - i * 5}%` }} />
+                    </div>
+                  ))}
+                </div>
+                {/* Passage detail placeholder */}
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-xs text-text-muted">Select a change to view details</p>
+                </div>
+              </div>
+            </div>
+
           </div>
         </>
       )}
@@ -1066,8 +1096,11 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           <div className="flex flex-1 overflow-hidden">
 
             {/* Left: Analysis panel — always visible on desktop, tab-gated on mobile */}
-            <div className={`md:flex md:flex-col md:w-[360px] md:flex-none md:border-r md:border-bg-border
-              ${activeTab === "analysis" ? "flex flex-col flex-1" : "hidden"}`}>
+            <div className={`md:w-[360px] md:border-r md:border-bg-border ${
+              activeTab === "analysis"
+                ? "flex flex-col flex-1 md:flex-none"
+                : "hidden md:flex md:flex-col md:flex-none"
+            }`}>
               <AnalysisPanel
                 data={data}
                 allPassages={allPassages}
@@ -1085,7 +1118,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
             </div>
 
             {/* Right: Changes panel — always visible on desktop, tab-gated on mobile */}
-            <div className={`flex-1 overflow-hidden flex flex-col ${activeTab === "changes" ? "" : "hidden md:flex"}`}>
+            <div className={`flex-1 overflow-hidden ${activeTab === "changes" ? "flex flex-col" : "hidden md:flex md:flex-col"}`}>
 
               {/* Filter bar */}
               <div className="shrink-0 border-b border-bg-border bg-bg-base flex overflow-x-auto">
@@ -1166,6 +1199,11 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           <button onClick={() => window.history.back()} className="text-xs font-semibold px-4 py-2 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors">Go back</button>
         </div>
       )}
+
+      {/* Persistent disclaimer — always visible, never requires scrolling */}
+      <div className="shrink-0 border-t border-bg-border/40 px-6 py-1 bg-bg-base">
+        <p className="text-[10px] text-text-muted/60 text-center">Not financial advice. For informational purposes only.</p>
+      </div>
     </div>
   );
 }
