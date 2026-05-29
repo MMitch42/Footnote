@@ -165,6 +165,9 @@ function computeWordDiff(oldText: string, newText: string): WordOp[] | null {
 }
 
 /* ── Analysis Panel ─────────────────────────────────────────── */
+const CONCERNS_LIMIT = 5;
+const REASSURANCES_LIMIT = 3;
+
 function AnalysisPanel({
   data, allPassages, highPassages, plan,
   watching, watchLoading, onToggleWatch,
@@ -184,6 +187,8 @@ function AnalysisPanel({
   scoringMore: boolean;
   onScoreMore: () => void;
 }) {
+  const [showAllConcerns, setShowAllConcerns] = useState(false);
+  const [showAllReassurances, setShowAllReassurances] = useState(false);
   const synthesis = data.synthesis;
   const isPro = plan !== "free";
 
@@ -299,7 +304,7 @@ function AnalysisPanel({
               New concerns <span className="text-diff-rem-text ml-1">{concerns.length}</span>
             </p>
             <div className="space-y-3">
-              {concerns.map((c, i) => (
+              {(showAllConcerns ? concerns : concerns.slice(0, CONCERNS_LIMIT)).map((c, i) => (
                 <div key={i} className="flex gap-3">
                   <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${SEVERITY_DOT[c.severity] ?? "bg-text-muted"}`} />
                   <div className="min-w-0">
@@ -314,6 +319,12 @@ function AnalysisPanel({
                 </div>
               ))}
             </div>
+            {concerns.length > CONCERNS_LIMIT && (
+              <button onClick={() => setShowAllConcerns((v) => !v)}
+                className="mt-3 text-xs text-text-muted hover:text-text-secondary transition-colors">
+                {showAllConcerns ? "Show less" : `+${concerns.length - CONCERNS_LIMIT} more`}
+              </button>
+            )}
           </div>
         )}
 
@@ -343,7 +354,7 @@ function AnalysisPanel({
               Reassurances <span className="text-diff-add-text ml-1">{reassurances.length}</span>
             </p>
             <div className="space-y-3">
-              {reassurances.map((r, i) => (
+              {(showAllReassurances ? reassurances : reassurances.slice(0, REASSURANCES_LIMIT)).map((r, i) => (
                 <div key={i} className="flex gap-3">
                   <div className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1.5 ${SEVERITY_DOT[r.severity] ?? "bg-text-muted"}`} />
                   <div className="min-w-0">
@@ -358,6 +369,12 @@ function AnalysisPanel({
                 </div>
               ))}
             </div>
+            {reassurances.length > REASSURANCES_LIMIT && (
+              <button onClick={() => setShowAllReassurances((v) => !v)}
+                className="mt-3 text-xs text-text-muted hover:text-text-secondary transition-colors">
+                {showAllReassurances ? "Show less" : `+${reassurances.length - REASSURANCES_LIMIT} more`}
+              </button>
+            )}
           </div>
         )}
 
@@ -436,48 +453,32 @@ function AnalysisPanel({
           </button>
         )}
 
-        {/* Ongoing background scoring indicator / manual retry */}
+        {/* Ongoing background scoring indicator */}
         {(unscoredCount > 0 || scoringMore) && (
-          unscoredCount > 120 && !scoringMore ? (
-            // Large backlog — show a more prominent card so user knows they can request it
-            <div className="rounded-lg border border-bg-border bg-bg-raised p-4">
-              <p className="text-sm font-semibold text-text-primary mb-1">
-                {unscoredCount} more changes not yet scored
-              </p>
-              <p className="text-xs text-text-muted leading-relaxed mb-3">
-                This filing is large. Scoring may take a minute or two.
-              </p>
-              <button onClick={onScoreMore}
-                className="text-xs font-semibold px-3 py-2 rounded-lg bg-accent text-bg-base hover:bg-accent-bright transition-colors">
-                Score all {unscoredCount} changes
-              </button>
-            </div>
-          ) : (
-            <div className="flex items-center justify-between gap-3 py-1">
-              <div className="flex items-center gap-2">
-                {scoringMore ? (
-                  <div className="flex gap-1">
-                    {[0,1,2].map((i) => (
-                      <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
-                )}
-                <p className="text-xs text-text-muted">
-                  {scoringMore
-                    ? `Analyzing ${unscoredCount} more change${unscoredCount !== 1 ? "s" : ""}…`
-                    : `${unscoredCount} change${unscoredCount !== 1 ? "s" : ""} pending analysis`}
-                </p>
-              </div>
-              {!scoringMore && (
-                <button onClick={onScoreMore}
-                  className="text-xs font-medium text-accent hover:text-accent-bright transition-colors shrink-0">
-                  Analyze now
-                </button>
+          <div className="flex items-center justify-between gap-3 py-1">
+            <div className="flex items-center gap-2">
+              {scoringMore ? (
+                <div className="flex gap-1">
+                  {[0,1,2].map((i) => (
+                    <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                  ))}
+                </div>
+              ) : (
+                <div className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
               )}
+              <p className="text-xs text-text-muted">
+                {scoringMore
+                  ? `Analyzing ${unscoredCount} more change${unscoredCount !== 1 ? "s" : ""}…`
+                  : `${unscoredCount} change${unscoredCount !== 1 ? "s" : ""} pending analysis`}
+              </p>
             </div>
-          )
+            {!scoringMore && (
+              <button onClick={onScoreMore}
+                className="text-xs font-medium text-accent hover:text-accent-bright transition-colors shrink-0">
+                Analyze now
+              </button>
+            )}
+          </div>
         )}
 
       </div>
@@ -723,16 +724,13 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     }).catch(() => {});
   }, [ticker]);
 
-  // Auto-score remaining passages — only when backlog is small enough to complete within timeout.
-  // Large filings (>120 unscored) would exceed the 120s route timeout; let the user trigger manually.
-  const AUTO_SCORE_THRESHOLD = 120;
+  // Auto-score remaining passages in the background once initial load finishes.
+  // Railway completes the job regardless of frontend timeout — results are in Supabase on next fresh load.
   useEffect(() => {
     if (!data || data.error || loading || scoringMore || unscoredCount === 0) return;
-    if (unscoredCount > AUTO_SCORE_THRESHOLD) return;
     const key = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
     if (autoScoredRef.current.has(key)) return;
     autoScoredRef.current.add(key);
-    // Small delay so the UI renders the initial results first
     const timer = setTimeout(() => scoreMore(), 600);
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1060,8 +1058,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               <span className="text-accent">→</span>
               <span className="text-text-secondary">{data.date_new}</span>
             </div>
-            {/* Filing type toggle */}
-            {!isHistorical && (
+            {/* Filing type toggle — only for standard domestic filers (10-K/10-Q); foreign filers use 20-F/6-K */}
+            {!isHistorical && (data.filing_type === "10-K" || data.filing_type === "10-Q") && (
               <div className="ml-auto flex items-center gap-1 shrink-0">
                 {(["10-K", "10-Q"] as const).map((t) => (
                   <button key={t} onClick={() => switchFilingType(t)}
@@ -1172,17 +1170,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                         rowRef={i === selectedIdx ? selectedRowRef : undefined}
                       />
                     ))
-                  )}
-                  {unscoredCount > 0 && (
-                    <div className="px-3 py-3 border-t border-bg-border bg-bg-surface">
-                      <p className="text-[11px] text-text-muted mb-2">
-                        {unscoredCount} more change{unscoredCount !== 1 ? "s" : ""} not yet analyzed
-                      </p>
-                      <button onClick={scoreMore} disabled={scoringMore}
-                        className="w-full text-xs font-medium py-2 rounded-lg border border-accent/30 text-accent hover:bg-accent/5 hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-wait">
-                        {scoringMore ? "Analyzing…" : `Analyze ${unscoredCount} more`}
-                      </button>
-                    </div>
                   )}
                 </div>
 

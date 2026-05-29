@@ -74,12 +74,6 @@ export default function RootLayout({
           {children}
           <FeatureLauncher />
           <ChatWidget />
-          {/* Global disclaimer — appears on every page */}
-          <div className="border-t border-bg-border/50 py-2 px-6 text-center">
-            <p className="text-[10px] text-text-muted">
-              Not financial advice. For informational purposes only.
-            </p>
-          </div>
         </body>
       </html>
     </ClerkProvider>
