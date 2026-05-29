@@ -54,6 +54,7 @@ export default function Home() {
   const [email, setEmail] = useState("");
   const [submitted, setSubmitted] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
+  const [filingType, setFilingType] = useState<"10-K" | "10-Q">("10-K");
   const router = useRouter();
 
   useEffect(() => {
@@ -140,7 +141,8 @@ export default function Home() {
   const navigate = (resolved: string) => {
     setShowSuggestions(false);
     setSuggestions([]);
-    router.push(`/diff/${resolved}`);
+    const url = filingType === "10-Q" ? `/diff/${resolved}?type=10-Q` : `/diff/${resolved}`;
+    router.push(url);
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -282,6 +284,25 @@ export default function Home() {
               </div>
             )}
           </div>
+          {/* Filing type toggle — Pro only; free users always get 10-K */}
+          {(plan === "pro" || plan === "research") && (
+            <div className="flex items-center gap-1.5 mt-2.5">
+              {(["10-K", "10-Q"] as const).map((type) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => setFilingType(type)}
+                  className={`px-2.5 py-1 rounded font-mono text-xs font-medium transition-colors duration-150 border ${
+                    filingType === type
+                      ? "bg-accent/15 border-accent/40 text-accent"
+                      : "border-bg-border text-text-muted hover:border-accent/30 hover:text-text-secondary"
+                  }`}
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          )}
           <p className="text-xs text-text-muted mt-2">
             Any public company. See exactly what changed in their last filing.
           </p>
@@ -390,7 +411,7 @@ export default function Home() {
                   return (
                     <button
                       key={i}
-                      onClick={() => router.push(`/diff/${entry.ticker}`)}
+                      onClick={() => router.push(`/diff/${entry.ticker}${entry.filing_type === "10-Q" ? "?type=10-Q" : ""}`)}
                       className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group"
                     >
                       {/* Score dot */}
