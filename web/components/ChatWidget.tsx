@@ -3,9 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
-import { getDiffContext, subscribeDiffContext, type DiffContextData } from "@/lib/diffContext";
+import { getDiffContext, subscribeDiffContext, requestPassageNavigation, type DiffContextData } from "@/lib/diffContext";
 
-type Message = { role: "user" | "assistant"; content: string };
+type Message = { role: "user" | "assistant"; content: string; passageIdx?: number };
 
 const GENERIC_SUGGESTIONS = [
   "What makes a filing change worth acting on?",
@@ -79,10 +79,15 @@ export function ChatWidget() {
         }),
       });
       const data = await res.json();
-      const reply = res.ok
+      const raw = res.ok
         ? (data.content ?? "No response.")
         : (data.error ?? "Something went wrong.");
-      setMessages((prev) => [...prev, { role: "assistant", content: reply }]);
+      // Parse optional [SHOW:N] navigation marker (1-based from AI → 0-based for UI)
+      const navMatch = raw.match(/\[SHOW:(\d+)\]/i);
+      const passageIdx = navMatch ? Math.max(0, parseInt(navMatch[1], 10) - 1) : undefined;
+      const reply = raw.replace(/\[SHOW:\d+\]/gi, "").trim();
+      if (passageIdx !== undefined) requestPassageNavigation(passageIdx);
+      setMessages((prev) => [...prev, { role: "assistant", content: reply, passageIdx }]);
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -197,14 +202,25 @@ export function ChatWidget() {
                 ) : (
                   messages.map((m, i) => (
                     <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
-                      <div
-                        className={`max-w-[88%] px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
-                          m.role === "user"
-                            ? "bg-accent text-bg-base font-medium"
-                            : "bg-bg-raised text-text-secondary border border-bg-border"
-                        }`}
-                      >
-                        {m.content}
+                      <div className="flex flex-col gap-1 max-w-[88%]">
+                        <div
+                          className={`px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
+                            m.role === "user"
+                              ? "bg-accent text-bg-base font-medium"
+                              : "bg-bg-raised text-text-secondary border border-bg-border"
+                          }`}
+                        >
+                          {m.content}
+                        </div>
+                        {m.role === "assistant" && m.passageIdx !== undefined && diffCtx && (
+                          <button
+                            onClick={() => requestPassageNavigation(m.passageIdx!)}
+                            className="self-start ml-1 flex items-center gap-1 text-[10px] font-semibold text-accent hover:text-accent-bright transition-colors"
+                          >
+                            <span>→</span>
+                            <span>View passage {m.passageIdx + 1}</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))

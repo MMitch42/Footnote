@@ -46,3 +46,24 @@ export function subscribeDiffContext(fn: () => void): () => void {
   _subs.add(fn);
   return () => { _subs.delete(fn); };
 }
+
+// ── Passage navigation ───────────────────────────────────────────
+// ChatWidget writes here when the AI identifies a specific passage.
+// DiffPageClient subscribes and jumps to the passage in the Changes panel.
+
+let _navIdx: number | null = null;
+const _navSubs = new Set<() => void>();
+
+export function requestPassageNavigation(idx: number | null): void {
+  _navIdx = idx;
+  _navSubs.forEach((fn) => fn());
+}
+
+export function getNavigationRequest(): number | null {
+  return _navIdx;
+}
+
+export function subscribeNavigation(fn: () => void): () => void {
+  _navSubs.add(fn);
+  return () => { _navSubs.delete(fn); };
+}

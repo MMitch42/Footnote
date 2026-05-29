@@ -4,7 +4,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
-import { setDiffContext } from "@/lib/diffContext";
+import { setDiffContext, subscribeNavigation, getNavigationRequest } from "@/lib/diffContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -602,6 +602,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const [activeTab, setActiveTab] = useState<ActiveTab>("analysis");
   const [filter, setFilter] = useState<SectionFilter>("all");
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
   const selectedRowRef = useRef<HTMLButtonElement>(null);
 
   const [watching, setWatching] = useState(false);
@@ -648,6 +649,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     setSlowLoad(false);
     setError(null);
     setSelectedIdx(null);
+    setSearchQuery("");
     setActiveTab("analysis");
 
     const slowTimer = setTimeout(() => setSlowLoad(true), 25_000);
@@ -821,7 +823,19 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     filter === "high" ? highPassages :
     allPassages.filter((p) => p.section === filter);
 
-  const selected = selectedIdx !== null ? filtered[selectedIdx] ?? null : null;
+  // Text search applied on top of section filter
+  const searched = searchQuery.trim()
+    ? filtered.filter((p) => {
+        const q = searchQuery.toLowerCase();
+        return (
+          p.old?.toLowerCase().includes(q) ||
+          p.new?.toLowerCase().includes(q) ||
+          p.explanation?.toLowerCase().includes(q)
+        );
+      })
+    : filtered;
+
+  const selected = selectedIdx !== null ? searched[selectedIdx] ?? null : null;
 
   const sectionCounts = data
     ? Object.fromEntries(Object.entries(data.sections).map(([k, v]) => [k, (v as SectionDiff).changed_passages.length]))
@@ -831,15 +845,27 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   useEffect(() => {
     if (activeTab !== "changes") return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => i === null ? 0 : Math.min(i + 1, filtered.length - 1)); }
+      if (e.key === "ArrowDown") { e.preventDefault(); setSelectedIdx((i) => i === null ? 0 : Math.min(i + 1, searched.length - 1)); }
       if (e.key === "ArrowUp")   { e.preventDefault(); setSelectedIdx((i) => i === null ? 0 : Math.max(i - 1, 0)); }
       if (e.key === "Escape")    { setSelectedIdx(null); }
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [filtered.length, activeTab]);
+  }, [searched.length, activeTab]);
 
   useEffect(() => { selectedRowRef.current?.scrollIntoView({ block: "nearest" }); }, [selectedIdx]);
+
+  // Navigate to a passage when ChatWidget fires a navigation request
+  useEffect(() => {
+    return subscribeNavigation(() => {
+      const idx = getNavigationRequest();
+      if (idx === null || !data) return;
+      setActiveTab("changes");
+      setFilter("all");
+      setSearchQuery("");
+      setSelectedIdx(idx);
+    });
+  }, [data]);
 
   // Opening a passage from Analysis tab switches to Changes tab
   const selectPassageFromAnalysis = (idx: number) => {
@@ -1128,21 +1154,34 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
             <div className={`flex-1 overflow-hidden ${activeTab === "changes" ? "flex flex-col" : "hidden md:flex md:flex-col"}`}>
 
               {/* Filter bar */}
-              <div className="shrink-0 border-b border-bg-border bg-bg-base flex overflow-x-auto">
-                {(["all", "high", "item_1a", "item_7", "item_3"] as SectionFilter[]).map((f) => {
-                  const count = f === "all" ? allPassages.length : f === "high" ? highPassages.length : (sectionCounts[f] ?? 0);
-                  if (f !== "all" && f !== "high" && count === 0) return null;
-                  if (f === "high" && highPassages.length === 0) return null;
-                  const label = f === "all" ? `All (${count})` : f === "high" ? `High (${count})` : `Item ${SECTION_SHORT[f]} (${count})`;
-                  return (
-                    <button key={f} onClick={() => { setFilter(f); setSelectedIdx(null); }}
-                      className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
-                        filter === f ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
-                      }`}>
-                      {label}
-                    </button>
-                  );
-                })}
+              <div className="shrink-0 border-b border-bg-border bg-bg-base flex items-stretch">
+                {/* Section filter pills — scrollable */}
+                <div className="flex overflow-x-auto flex-1 min-w-0">
+                  {(["all", "high", "item_1a", "item_7", "item_3"] as SectionFilter[]).map((f) => {
+                    const count = f === "all" ? allPassages.length : f === "high" ? highPassages.length : (sectionCounts[f] ?? 0);
+                    if (f !== "all" && f !== "high" && count === 0) return null;
+                    if (f === "high" && highPassages.length === 0) return null;
+                    const label = f === "all" ? `All (${count})` : f === "high" ? `High (${count})` : `Item ${SECTION_SHORT[f]} (${count})`;
+                    return (
+                      <button key={f} onClick={() => { setFilter(f); setSelectedIdx(null); }}
+                        className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
+                          filter === f ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
+                        }`}>
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
+                {/* Search input — always visible */}
+                <div className="shrink-0 flex items-center px-2 border-l border-bg-border">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => { setSearchQuery(e.target.value); setSelectedIdx(null); }}
+                    placeholder="Search…"
+                    className="w-24 sm:w-32 h-6 px-2 text-xs bg-bg-surface border border-bg-border rounded text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent/60 transition-colors"
+                  />
+                </div>
               </div>
 
               {/* Passage list + detail */}
@@ -1151,10 +1190,14 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 <div className={`overflow-y-auto bg-bg-base md:w-64 md:shrink-0 md:border-r md:border-bg-border ${
                   selected !== null ? "hidden md:block" : "flex-1 md:flex-none"
                 }`}>
-                  {filtered.length === 0 ? (
-                    <div className="px-4 py-8 text-center"><p className="text-xs text-text-muted">No changes</p></div>
+                  {searched.length === 0 ? (
+                    <div className="px-4 py-8 text-center">
+                      <p className="text-xs text-text-muted">
+                        {searchQuery ? `No changes matching "${searchQuery}"` : "No changes"}
+                      </p>
+                    </div>
                   ) : (
-                    filtered.map((p, i) => (
+                    searched.map((p, i) => (
                       <PassageRow key={i} passage={p} isSelected={i === selectedIdx}
                         onClick={() => setSelectedIdx(i)}
                         rowRef={i === selectedIdx ? selectedRowRef : undefined}

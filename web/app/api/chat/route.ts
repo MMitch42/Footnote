@@ -103,7 +103,7 @@ function buildDiffContextBlock(ctx: DiffContext): string {
 
   const passages = ctx.topPassages ?? [];
   if (passages.length > 0) {
-    lines.push(`CHANGED PASSAGES (top ${passages.length} by significance):`);
+    lines.push(`CHANGED PASSAGES (top ${passages.length} by significance, numbered for reference):`);
     lines.push("");
     passages.forEach((p, i) => {
       const section = SECTION_FULL[p.section ?? ""] ?? p.section ?? "Unknown";
@@ -115,6 +115,8 @@ function buildDiffContextBlock(ctx: DiffContext): string {
       if (p.new) lines.push(`    ADDED: "${p.new}"`);
       lines.push("");
     });
+    lines.push("NAVIGATION: When the user asks to find, see, or show a specific passage, append [SHOW:N] at the very end of your response (after all text), where N is the passage number above. Only include [SHOW:N] when the user wants to view a particular change — not for general questions.");
+    lines.push("");
   }
 
   lines.push("=== END DIFF ===");
