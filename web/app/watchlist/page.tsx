@@ -29,6 +29,7 @@ function WatchlistContent() {
   const [companyNames, setCompanyNames] = useState<Record<string, string>>({});
   const [digestOptIn, setDigestOptIn] = useState(false);
   const [digestToggling, setDigestToggling] = useState(false);
+  const [listFilter, setListFilter] = useState("");
   const searchRef = useRef<HTMLDivElement>(null);
 
   const fetchWatchlist = async () => {
@@ -279,9 +280,20 @@ function WatchlistContent() {
 
         {/* List */}
         <div>
-          <p className="text-xs font-semibold text-text-muted uppercase tracking-wide mb-4">
-            Watching {items.length > 0 ? `· ${items.length} ticker${items.length !== 1 ? "s" : ""}` : ""}
-          </p>
+          <div className="flex items-center justify-between gap-4 mb-4 flex-wrap">
+            <p className="text-xs font-semibold text-text-muted uppercase tracking-wide">
+              Watching {items.length > 0 ? `· ${items.length} ticker${items.length !== 1 ? "s" : ""}` : ""}
+            </p>
+            {items.length >= 8 && (
+              <input
+                type="text"
+                value={listFilter}
+                onChange={(e) => setListFilter(e.target.value)}
+                placeholder="Filter…"
+                className="h-8 px-3 bg-bg-surface border border-bg-border rounded text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors w-36"
+              />
+            )}
+          </div>
 
           {loading ? (
             <div className="flex gap-1">
@@ -294,9 +306,21 @@ function WatchlistContent() {
               <p className="text-sm text-text-muted mb-1">No tickers yet.</p>
               <p className="text-xs text-text-muted">Add a ticker above to start tracking filing changes.</p>
             </div>
-          ) : (
+          ) : (() => {
+            const q = listFilter.trim().toLowerCase();
+            const visible = q
+              ? items.filter((i) =>
+                  i.ticker.toLowerCase().includes(q) ||
+                  (companyNames[i.ticker] ?? "").toLowerCase().includes(q)
+                )
+              : items;
+            return visible.length === 0 ? (
+              <div className="rounded-xl border border-bg-border px-6 py-8 text-center">
+                <p className="text-sm text-text-muted">No matches for &ldquo;{listFilter}&rdquo;</p>
+              </div>
+            ) : (
             <div className="rounded-xl border border-bg-border divide-y divide-bg-border overflow-hidden">
-              {items.map((item) => (
+              {visible.map((item) => (
                 <div key={item.ticker} className="px-5 py-4 flex items-center gap-4">
                   {/* Company name + ticker */}
                   <Link
@@ -351,7 +375,8 @@ function WatchlistContent() {
                 </div>
               ))}
             </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Info */}
@@ -384,12 +409,12 @@ function WatchlistContent() {
                   </div>
                 </div>
 
-                {/* Monthly digest — toggleable */}
+                {/* Weekly digest — toggleable */}
                 <div className="px-5 py-4 flex items-center justify-between gap-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-text-primary">Monthly digest</p>
+                    <p className="text-sm font-medium text-text-primary">Weekly digest</p>
                     <p className="text-xs text-text-muted mt-0.5 leading-relaxed">
-                      A summary of all your tickers&apos; filing activity, sent on the 1st of each month.
+                      A weekly summary of all your tickers&apos; filing activity.
                     </p>
                   </div>
                   <button

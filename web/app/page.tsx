@@ -240,7 +240,7 @@ export default function Home() {
           <p className="text-base text-text-secondary leading-relaxed mb-10 max-w-lg">
             Every time a company files a new 10-K or 10-Q, Footnote compares it to the previous one.
             Changed passages are scored for significance. When something material shifts in the risk factors,
-            MD&amp;A, or legal disclosures, you find out. Usually before most people notice.
+            MD&amp;A, or legal disclosures, you find out.
           </p>
 
           <div ref={searchRef} className="relative max-w-sm">

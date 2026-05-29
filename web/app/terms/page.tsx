@@ -14,6 +14,9 @@ export default function TermsPage() {
       </nav>
 
       <div className="max-w-3xl mx-auto px-6 py-14">
+        <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors mb-8">
+          ← Back
+        </Link>
         <h1 className="font-mono text-2xl font-bold text-text-primary mb-2">Terms of Service</h1>
         <p className="text-sm text-text-muted mb-10">Last updated: May 26, 2026</p>
 
@@ -127,6 +130,12 @@ export default function TermsPage() {
             </p>
           </section>
 
+        </div>
+
+        <div className="mt-12 pt-8 border-t border-bg-border">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-accent transition-colors">
+            ← Back to Footnote
+          </Link>
         </div>
       </div>
     </div>

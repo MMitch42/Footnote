@@ -3,14 +3,22 @@
 import { useState, useEffect, useRef } from "react";
 import { usePathname } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import { getDiffContext, subscribeDiffContext, type DiffContextData } from "@/lib/diffContext";
 
 type Message = { role: "user" | "assistant"; content: string };
 
-const SUGGESTIONS = [
-  "What should I look for in Risk Factors?",
-  "What does a high-novelty score actually mean?",
-  "How do I interpret MD&A language changes?",
-  "What's the difference between escalating and reassuring?",
+const GENERIC_SUGGESTIONS = [
+  "What makes a filing change worth acting on?",
+  "How does Footnote decide a change scores 9/10 vs 4/10?",
+  "What's the Lazy Prices research and why does it predict returns?",
+  "How do Risk Factors, MD&A, and Legal Proceedings differ in signal value?",
+];
+
+const DIFF_SUGGESTIONS = [
+  "Find every change related to AI, China, or litigation",
+  "What did they quietly stop saying compared to last year?",
+  "Which passages show hardened legal or liability language?",
+  "What specific dollar figures or metrics changed in this filing?",
 ];
 
 export function ChatWidget() {
@@ -19,14 +27,19 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
+  const [diffCtx, setDiffCtx] = useState<DiffContextData | null>(getDiffContext);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { isSignedIn, isLoaded } = useUser();
   const pathname = usePathname();
 
-  // Extract ticker + filing context from URL if on diff page
+  // Keep local diffCtx in sync with the store
+  useEffect(() => subscribeDiffContext(() => setDiffCtx(getDiffContext())), []);
+
+  // Extract ticker from URL (fallback when diff hasn't loaded yet)
   const tickerMatch = pathname.match(/^\/diff\/([^/?]+)/);
-  const ticker = tickerMatch?.[1] ?? null;
+  const ticker = diffCtx?.ticker ?? tickerMatch?.[1] ?? null;
+  const suggestions = diffCtx ? DIFF_SUGGESTIONS : GENERIC_SUGGESTIONS;
 
   // Fetch subscription plan when signed in
   useEffect(() => {
@@ -62,7 +75,7 @@ export function ChatWidget() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           messages: next,
-          context: ticker ? { ticker } : undefined,
+          context: diffCtx ?? (ticker ? { ticker } : undefined),
         }),
       });
       const data = await res.json();
@@ -98,9 +111,13 @@ export function ChatWidget() {
               <span className="font-mono text-xs font-bold text-text-primary tracking-widest uppercase">
                 Footnote AI
               </span>
-              {ticker && (
+              {diffCtx ? (
+                <span className="font-mono text-xs text-accent tracking-wider truncate max-w-[140px]">
+                  · {diffCtx.companyName ?? diffCtx.ticker}
+                </span>
+              ) : ticker ? (
                 <span className="font-mono text-xs text-accent tracking-wider">· {ticker}</span>
-              )}
+              ) : null}
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -149,11 +166,13 @@ export function ChatWidget() {
                 {messages.length === 0 ? (
                   <div className="space-y-2">
                     <p className="text-xs text-text-muted pb-1">
-                      {ticker
+                      {diffCtx
+                        ? `Gemini has read the full diff for ${diffCtx.companyName ?? diffCtx.ticker} — ask anything about what changed.`
+                        : ticker
                         ? `Ask anything about ${ticker}'s filing changes or SEC disclosures in general.`
                         : "Ask anything about SEC filings and how to read them."}
                     </p>
-                    {SUGGESTIONS.map((s) => (
+                    {suggestions.map((s) => (
                       <button
                         key={s}
                         onClick={() => send(s)}

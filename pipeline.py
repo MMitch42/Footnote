@@ -18,6 +18,10 @@ from synthesis import synthesize
 
 SECTIONS = ["item_1a", "item_7", "item_3"]
 
+# Passages beyond this cap are stored with null scores so users can trigger
+# on-demand scoring rather than silently losing data.
+INITIAL_SCORE_CAP = 60
+
 # Foreign private issuers file 20-F instead of 10-K (e.g. TME, BABA, NIO).
 # Automatically fall back so searches "just work" regardless of form type.
 FORM_FALLBACKS: dict[str, list[str]] = {
@@ -37,13 +41,17 @@ def _should_cache(scored: list[dict]) -> bool:
 
 def _fill_missing_scores(section_diff: dict, ticker: str, section: str) -> tuple[dict, bool]:
     """
-    Re-score any passages whose score is None (from prior rate-limit failures).
-    Returns (updated_diff, was_updated).  No-op if everything is already scored.
+    Re-score passages whose score is None due to a prior rate-limit or API failure.
+    Passages intentionally skipped by the initial cap have explanation=None and are
+    NOT auto-retried here — those require an explicit user-triggered score-more call.
+    Returns (updated_diff, was_updated).  No-op if nothing needs retrying.
     """
     passages = section_diff.get("changed_passages", [])
     null_indices = [
         i for i, p in enumerate(passages)
-        if p.get("score") is None and (p.get("old") or p.get("new"))
+        if p.get("score") is None
+        and (p.get("old") or p.get("new"))
+        and p.get("explanation") is not None  # explanation=None means cap-skipped, not an error
     ]
     if not null_indices:
         return section_diff, False
@@ -101,8 +109,17 @@ def alert_mode(ticker: str, form: str = "10-K", sections: list = None) -> dict:
 
         diff = compute_diff(old_filing.get(section, ""), new_filing.get(section, ""))
         scorable = filter_scorable(diff["changed_passages"])
-        scored = score_all(scorable)
-        diff["changed_passages"] = scored
+        to_score = scorable[:INITIAL_SCORE_CAP]
+        remainder = scorable[INITIAL_SCORE_CAP:]
+        scored = score_all(to_score)
+        cap_skipped = [{**p, "score": None, "direction": None, "explanation": None} for p in remainder]
+        diff["changed_passages"] = scored + cap_skipped
+        if remainder:
+            print(
+                f"  [pipeline] {ticker}/{section}: {len(remainder)} passages beyond initial cap"
+                f" — stored for on-demand scoring",
+                flush=True,
+            )
 
         if _should_cache(scored):
             db.upsert_diff(ticker, actual_form, new_filing["filing_date"], old_filing["filing_date"], section, diff)
@@ -175,8 +192,17 @@ def historical_mode(ticker: str, form: str = "10-K", n: int = 10) -> list[dict]:
 
             diff = compute_diff(old_f.get(section, ""), new_f.get(section, ""))
             scorable = filter_scorable(diff["changed_passages"])
-            scored = score_all(scorable)
-            diff["changed_passages"] = scored
+            to_score = scorable[:INITIAL_SCORE_CAP]
+            remainder = scorable[INITIAL_SCORE_CAP:]
+            scored = score_all(to_score)
+            cap_skipped = [{**p, "score": None, "direction": None, "explanation": None} for p in remainder]
+            diff["changed_passages"] = scored + cap_skipped
+            if remainder:
+                print(
+                    f"  [pipeline] {ticker}/{section}: {len(remainder)} passages beyond initial cap"
+                    f" — stored for on-demand scoring",
+                    flush=True,
+                )
 
             if _should_cache(scored):
                 db.upsert_diff(ticker, form, date_new, date_old, section, diff)

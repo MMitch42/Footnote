@@ -3,7 +3,9 @@ import os
 import uuid
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pipeline import alert_mode, historical_mode
+from pipeline import alert_mode, historical_mode, INITIAL_SCORE_CAP
+from scoring import score_all
+from synthesis import synthesize
 import fetcher as edgar_client
 import db
 
@@ -237,4 +239,82 @@ def get_specific_diff(ticker: str, date_new: str, date_old: str, form: str = "10
         "date_old": date_old,
         "sections": sections,
         "synthesis": synthesis,
+    }
+
+
+@app.post("/score-more/{ticker}")
+def score_more(ticker: str, date_new: str, date_old: str, form: str = "10-K"):
+    """
+    Score passages that were skipped by the initial INITIAL_SCORE_CAP.
+    Cap-skipped passages have score=None AND explanation=None.
+    Returns the full updated diff result for all three sections.
+    """
+    ticker = ticker.upper()
+    total_scored = 0
+    sections_updated = {}
+
+    for section in ["item_1a", "item_7", "item_3"]:
+        cached = db.get_diff(ticker, form, date_new, date_old, section)
+        if not cached:
+            continue
+
+        passages = cached.get("changed_passages") or []
+        cap_indices = [
+            i for i, p in enumerate(passages)
+            if p.get("score") is None
+            and p.get("explanation") is None
+            and (p.get("old") or p.get("new"))
+        ]
+
+        if not cap_indices:
+            sections_updated[section] = cached
+            continue
+
+        print(
+            f"  [score-more] {ticker}/{section}: scoring {len(cap_indices)} cap-skipped passage(s)",
+            flush=True,
+        )
+        rescored = score_all([passages[i] for i in cap_indices])
+        updated = list(passages)
+        for i, new_p in zip(cap_indices, rescored):
+            updated[i] = new_p
+
+        updated_diff = {**cached, "changed_passages": updated}
+        db.upsert_diff(ticker, form, date_new, date_old, section, updated_diff)
+        sections_updated[section] = updated_diff
+        total_scored += len(cap_indices)
+
+    company_name = edgar_client.get_company_name(ticker)
+
+    # Re-synthesize from the full passage set now that all scoring is complete.
+    # This overwrites the partial synthesis that was built from the initial cap.
+    # Only runs when passages were actually newly scored — if nothing changed,
+    # return the existing cached synthesis as-is.
+    if total_scored > 0:
+        all_passages = [
+            {**p, "section": sec}
+            for sec, diff_data in sections_updated.items()
+            for p in diff_data.get("changed_passages", [])
+        ]
+        synthesis = synthesize(all_passages, ticker, form)
+        if not synthesis.get("_error"):
+            db.upsert_synthesis(ticker, form, date_new, date_old, synthesis)
+            print(f"  [score-more] {ticker}: synthesis updated from {len(all_passages)} passages", flush=True)
+        else:
+            # Fall back to whatever was cached if re-synthesis fails
+            synthesis = db.get_synthesis(ticker, form, date_new, date_old)
+            print(f"  [score-more] {ticker}: re-synthesis failed, keeping cached: {synthesis.get('_error')}", flush=True)
+    else:
+        synthesis = db.get_synthesis(ticker, form, date_new, date_old)
+
+    print(f"  [score-more] {ticker}: scored {total_scored} additional passages", flush=True)
+    return {
+        "ticker": ticker,
+        "company_name": company_name,
+        "filing_type": form,
+        "date_new": date_new,
+        "date_old": date_old,
+        "sections": sections_updated,
+        "synthesis": synthesis,
+        "newly_scored": total_scored,
     }

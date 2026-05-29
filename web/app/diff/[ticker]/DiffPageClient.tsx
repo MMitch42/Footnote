@@ -4,6 +4,7 @@ import { use, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
+import { setDiffContext } from "@/lib/diffContext";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -126,8 +127,9 @@ function shortTopic(explanation: string | null): string {
 function generateFallbackSummary(
   ticker: string, filingType: string, passages: Passage[], high: Passage[]
 ): string {
-  const esc = passages.filter((p) => p.direction === "escalating").length;
-  const rea = passages.filter((p) => p.direction === "reassuring").length;
+  if (passages.length === 0)
+    return `${ticker}'s ${filingType} is essentially unchanged from the prior filing. No meaningful language shifts detected.`;
+
   const highEsc = high.filter((p) => p.direction === "escalating").length;
   const highRea = high.filter((p) => p.direction === "reassuring").length;
 
@@ -167,6 +169,7 @@ function AnalysisPanel({
   data, allPassages, highPassages, plan,
   watching, watchLoading, onToggleWatch,
   onBrowseChanges, onSelectPassage,
+  unscoredCount, scoringMore, onScoreMore,
 }: {
   data: DiffResult;
   allPassages: Passage[];
@@ -177,16 +180,24 @@ function AnalysisPanel({
   onToggleWatch: () => void;
   onBrowseChanges: () => void;
   onSelectPassage: (idx: number) => void;
+  unscoredCount: number;
+  scoringMore: boolean;
+  onScoreMore: () => void;
 }) {
   const synthesis = data.synthesis;
   const isPro = plan !== "free";
 
   const esc = allPassages.filter((p) => p.direction === "escalating").length;
   const rea = allPassages.filter((p) => p.direction === "reassuring").length;
-  const verdict = esc > rea * 1.5 ? "ESCALATING" : rea > esc * 1.5 ? "REASSURING" : "MIXED";
+  const verdict =
+    allPassages.length === 0        ? "UNCHANGED" :
+    esc > rea * 1.5                 ? "ESCALATING" :
+    rea > esc * 1.5                 ? "REASSURING" : "MIXED";
   const verdictColor =
     verdict === "ESCALATING" ? "text-diff-rem-text" :
-    verdict === "REASSURING" ? "text-diff-add-text" : "text-text-secondary";
+    verdict === "REASSURING" ? "text-diff-add-text" :
+    verdict === "UNCHANGED"  ? "text-text-muted" :
+    "text-text-secondary";
 
   const execSummary = synthesis?.executive_summary ||
     generateFallbackSummary(data.ticker, data.filing_type, allPassages, highPassages);
@@ -203,7 +214,7 @@ function AnalysisPanel({
 
   return (
     <div className="overflow-y-auto flex-1 min-h-0">
-      <div className="p-4 sm:p-6 max-w-2xl space-y-7">
+      <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-7">
 
         {/* Verdict + stats */}
         <div>
@@ -425,6 +436,34 @@ function AnalysisPanel({
           </button>
         )}
 
+        {/* Ongoing background scoring indicator / manual retry */}
+        {(unscoredCount > 0 || scoringMore) && (
+          <div className="flex items-center justify-between gap-3 py-1">
+            <div className="flex items-center gap-2">
+              {scoringMore ? (
+                <div className="flex gap-1">
+                  {[0,1,2].map((i) => (
+                    <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                  ))}
+                </div>
+              ) : (
+                <div className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
+              )}
+              <p className="text-xs text-text-muted">
+                {scoringMore
+                  ? `Analyzing ${unscoredCount} more change${unscoredCount !== 1 ? "s" : ""}…`
+                  : `${unscoredCount} change${unscoredCount !== 1 ? "s" : ""} pending analysis`}
+              </p>
+            </div>
+            {!scoringMore && (
+              <button onClick={onScoreMore}
+                className="text-xs font-medium text-accent hover:text-accent-bright transition-colors shrink-0">
+                Analyze now
+              </button>
+            )}
+          </div>
+        )}
+
         <p className="text-xs text-text-muted pb-2">
           Not financial advice. For informational purposes only.
         </p>
@@ -564,6 +603,9 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const [watching, setWatching] = useState(false);
   const [watchLoading, setWatchLoading] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research">("free");
+  const [scoringMore, setScoringMore] = useState(false);
+  // Track which diffs we've already auto-scored so we don't loop
+  const autoScoredRef = useRef<Set<string>>(new Set());
 
   // Fetch diff data — check module-level cache first
   useEffect(() => {
@@ -572,6 +614,28 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     if (cached) {
       setData(cached);
       setLoading(false);
+      // Restore context from cache so ChatWidget works on re-visit
+      if (!cached.error) {
+        const allP = Object.entries(cached.sections ?? {}).flatMap(([sec, diff]) =>
+          (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section: sec }))
+        ).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        setDiffContext({
+          ticker: cached.ticker,
+          companyName: cached.company_name,
+          filingType: cached.filing_type,
+          dateNew: cached.date_new,
+          dateOld: cached.date_old,
+          synthesis: cached.synthesis ?? null,
+          topPassages: allP.slice(0, 25).map((p) => ({
+            old: p.old?.slice(0, 700) ?? "",
+            new: p.new?.slice(0, 700) ?? "",
+            score: p.score,
+            direction: p.direction,
+            explanation: p.explanation,
+            section: p.section,
+          })),
+        });
+      }
       return;
     }
 
@@ -590,11 +654,36 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
 
     fetch(url, { signal: AbortSignal.timeout(120_000) })
       .then((r) => r.json())
-      .then((d) => {
+      .then((d: DiffResult) => {
         clearTimeout(slowTimer);
         _diffCache.set(cacheKey, d);
         setData(d);
         setLoading(false);
+
+        // Populate the shared diff context so ChatWidget can answer specific questions
+        if (!d.error) {
+          const allP = Object.entries(d.sections ?? {}).flatMap(([sec, diff]) =>
+            (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section: sec }))
+          ).sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+
+          setDiffContext({
+            ticker: d.ticker,
+            companyName: d.company_name,
+            filingType: d.filing_type,
+            dateNew: d.date_new,
+            dateOld: d.date_old,
+            synthesis: d.synthesis ?? null,
+            // Top 25 passages — enough to answer virtually any specific question
+            topPassages: allP.slice(0, 25).map((p) => ({
+              old: p.old?.slice(0, 700) ?? "",
+              new: p.new?.slice(0, 700) ?? "",
+              score: p.score,
+              direction: p.direction,
+              explanation: p.explanation,
+              section: p.section,
+            })),
+          });
+        }
       })
       .catch((e) => {
         clearTimeout(slowTimer);
@@ -605,7 +694,10 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
         setLoading(false);
       });
 
-    return () => clearTimeout(slowTimer);
+    return () => {
+      clearTimeout(slowTimer);
+      setDiffContext(null); // clear when navigating away
+    };
   }, [ticker, dateNew, dateOld, isHistorical, filingType]);
 
   // Check watchlist + subscription
@@ -618,6 +710,18 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
       setPlan(sub.plan ?? "free");
     }).catch(() => {});
   }, [ticker]);
+
+  // Auto-score remaining passages in the background once initial load finishes
+  useEffect(() => {
+    if (!data || data.error || loading || scoringMore || unscoredCount === 0) return;
+    const key = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
+    if (autoScoredRef.current.has(key)) return;
+    autoScoredRef.current.add(key);
+    // Small delay so the UI renders the initial results first
+    const timer = setTimeout(() => scoreMore(), 600);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data, loading]);
 
   const switchFilingType = (type: "10-K" | "10-Q") => {
     if (type === filingType) return;
@@ -653,6 +757,60 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     : [];
 
   const highPassages = allPassages.filter((p) => (p.score ?? 0) >= 7);
+
+  // Passages stored with null score AND null explanation = cap-skipped, not yet analyzed
+  const unscoredCount = allPassages.filter((p) => p.score === null && p.explanation === null).length;
+
+  const scoreMore = async () => {
+    if (!data || scoringMore) return;
+    setScoringMore(true);
+    try {
+      const res = await fetch("/api/score-more", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: data.ticker,
+          form: data.filing_type,
+          date_new: data.date_new,
+          date_old: data.date_old,
+        }),
+      });
+      const updated: DiffResult = await res.json();
+      if (res.ok && !updated.error) {
+        // Update module cache so re-navigation hits the fresh data
+        const cacheKey = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
+        _diffCache.set(cacheKey, updated);
+        setData(updated);
+
+        // Refresh diffContext with newly scored passages
+        const allP = Object.entries(updated.sections ?? {})
+          .flatMap(([sec, diff]) =>
+            (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section: sec }))
+          )
+          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        setDiffContext({
+          ticker: updated.ticker,
+          companyName: updated.company_name,
+          filingType: updated.filing_type,
+          dateNew: updated.date_new,
+          dateOld: updated.date_old,
+          synthesis: updated.synthesis ?? null,
+          topPassages: allP.slice(0, 25).map((p) => ({
+            old: p.old?.slice(0, 700) ?? "",
+            new: p.new?.slice(0, 700) ?? "",
+            score: p.score,
+            direction: p.direction,
+            explanation: p.explanation,
+            section: p.section,
+          })),
+        });
+      }
+    } catch (e) {
+      console.error("[score-more] failed:", e);
+    } finally {
+      setScoringMore(false);
+    }
+  };
 
   const filtered =
     filter === "all"  ? allPassages :
@@ -737,19 +895,98 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
       </nav>
 
       {loading && (
-        <div className="flex-1 flex flex-col items-center justify-center gap-3 px-6 text-center">
-          <div className="flex gap-1">
-            {[0,1,2].map((i) => <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />)}
+        <>
+          {/* Skeleton tab bar */}
+          <div className="shrink-0 border-b border-bg-border bg-bg-base flex">
+            <div className="px-4 py-2.5 border-b-2 border-accent flex items-center">
+              <div className="h-2.5 w-14 bg-bg-raised rounded animate-pulse" />
+            </div>
+            <div className="px-4 py-2.5 flex items-center opacity-40">
+              <div className="h-2.5 w-20 bg-bg-raised rounded animate-pulse" />
+            </div>
           </div>
-          <p className="text-xs text-text-muted">Analyzing {ticker.toUpperCase()}…</p>
-          {slowLoad ? (
-            <p className="text-xs text-text-muted max-w-xs leading-relaxed">
-              Still working — large filings can take up to a minute on first analysis. Subsequent loads are instant.
-            </p>
-          ) : (
-            <p className="text-xs text-text-muted">First analysis ~20–30s · subsequent loads instant</p>
-          )}
-        </div>
+
+          {/* Skeleton analysis panel */}
+          <div className="overflow-y-auto flex-1 min-h-0">
+            <div className="p-4 sm:p-6 max-w-2xl mx-auto w-full space-y-7">
+
+              {/* Verdict + stats */}
+              <div className="space-y-2 pt-1">
+                <div className="h-7 w-40 bg-bg-surface rounded animate-pulse" />
+                <div className="h-3 w-72 bg-bg-surface rounded animate-pulse opacity-60" />
+              </div>
+
+              {/* Watch CTA */}
+              <div className="rounded-lg border border-bg-border bg-bg-raised p-4 flex items-center justify-between gap-4">
+                <div className="space-y-2 flex-1">
+                  <div className="h-3.5 w-36 bg-bg-surface rounded animate-pulse" />
+                  <div className="h-3 w-56 bg-bg-surface rounded animate-pulse opacity-60" />
+                </div>
+                <div className="h-8 w-20 bg-bg-surface rounded-lg animate-pulse shrink-0" />
+              </div>
+
+              {/* Sentiment */}
+              <div className="flex items-center gap-3">
+                <div className="h-3 w-28 bg-bg-surface rounded animate-pulse opacity-60" />
+                <div className="h-3 w-20 bg-bg-surface rounded animate-pulse" />
+              </div>
+
+              {/* Summary */}
+              <div className="space-y-2">
+                <div className="h-3 w-16 bg-bg-surface rounded animate-pulse opacity-60" />
+                <div className="pl-3 border-l-2 border-bg-border space-y-2">
+                  <div className="h-3 w-full bg-bg-surface rounded animate-pulse" />
+                  <div className="h-3 w-11/12 bg-bg-surface rounded animate-pulse" />
+                  <div className="h-3 w-4/5 bg-bg-surface rounded animate-pulse" />
+                  <div className="h-3 w-2/3 bg-bg-surface rounded animate-pulse opacity-60" />
+                </div>
+              </div>
+
+              {/* Concerns */}
+              <div className="space-y-3">
+                <div className="h-3 w-24 bg-bg-surface rounded animate-pulse opacity-60" />
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="flex gap-3" style={{ opacity: 1 - i * 0.18 }}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-bg-surface shrink-0 mt-1.5 animate-pulse" />
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="h-3 bg-bg-surface rounded animate-pulse" style={{ width: `${72 - i * 8}%` }} />
+                      <div className="h-2.5 w-full bg-bg-surface rounded animate-pulse opacity-50" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Reassurances */}
+              <div className="space-y-3">
+                <div className="h-3 w-28 bg-bg-surface rounded animate-pulse opacity-60" />
+                {[0, 1].map((i) => (
+                  <div key={i} className="flex gap-3" style={{ opacity: 1 - i * 0.3 }}>
+                    <div className="w-1.5 h-1.5 rounded-full bg-bg-surface shrink-0 mt-1.5 animate-pulse" />
+                    <div className="space-y-1.5 flex-1 min-w-0">
+                      <div className="h-3 bg-bg-surface rounded animate-pulse" style={{ width: `${65 - i * 10}%` }} />
+                      <div className="h-2.5 w-full bg-bg-surface rounded animate-pulse opacity-50" />
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Status message */}
+              <div className="flex items-center gap-2 pt-2">
+                <div className="flex gap-1">
+                  {[0,1,2].map((i) => (
+                    <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                  ))}
+                </div>
+                <p className="text-xs text-text-muted">
+                  {slowLoad
+                    ? "Still working — large filings can take up to a minute on first analysis."
+                    : `Analyzing ${ticker.toUpperCase()}… first run ~20–30s, subsequent loads instant.`}
+                </p>
+              </div>
+
+            </div>
+          </div>
+        </>
       )}
 
       {error && (
@@ -837,6 +1074,9 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               onToggleWatch={toggleWatch}
               onBrowseChanges={() => setActiveTab("changes")}
               onSelectPassage={selectPassageFromAnalysis}
+              unscoredCount={unscoredCount}
+              scoringMore={scoringMore}
+              onScoreMore={scoreMore}
             />
           ) : (
             <>
@@ -873,6 +1113,18 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                         rowRef={i === selectedIdx ? selectedRowRef : undefined}
                       />
                     ))
+                  )}
+                  {/* Score-more banner at bottom of list */}
+                  {unscoredCount > 0 && (
+                    <div className="px-3 py-3 border-t border-bg-border bg-bg-surface">
+                      <p className="text-[11px] text-text-muted mb-2">
+                        {unscoredCount} more change{unscoredCount !== 1 ? "s" : ""} not yet analyzed
+                      </p>
+                      <button onClick={scoreMore} disabled={scoringMore}
+                        className="w-full text-xs font-medium py-2 rounded-lg border border-accent/30 text-accent hover:bg-accent/5 hover:border-accent transition-colors disabled:opacity-50 disabled:cursor-wait">
+                        {scoringMore ? "Analyzing…" : `Analyze ${unscoredCount} more`}
+                      </button>
+                    </div>
                   )}
                 </div>
 

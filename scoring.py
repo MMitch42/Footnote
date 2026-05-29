@@ -52,7 +52,7 @@ def score_passage(old_text: str, new_text: str, max_retries: int = 2) -> dict:
     for attempt in range(max_retries + 1):
         try:
             response = _client.models.generate_content(
-                model="gemini-2.5-flash",
+                model="gemini-2.5-flash-lite",
                 contents=prompt,
                 config=types.GenerateContentConfig(
                     response_mime_type="application/json"
@@ -72,13 +72,22 @@ def score_passage(old_text: str, new_text: str, max_retries: int = 2) -> dict:
     raise last_error
 
 
-def score_all(changed_passages: list[dict], max_passages: int = 30) -> list[dict]:
+def score_all(changed_passages: list[dict], max_passages: int = 60) -> list[dict]:
     """
-    Score passages in parallel (5 workers) so a 30-passage filing takes ~6s
-    instead of ~90s sequential. Results are returned in original order.
+    Score passages in parallel (8 workers) so a large filing scores in ~15s
+    instead of minutes sequential. Results are returned in original order.
+
+    max_passages=60 per section — enough to capture all meaningful changes in
+    the largest 10-K filings (WMT, JPM, BAC etc.) without silently dropping data.
+    At 8 workers ~15s per section → ~45s for a full 3-section run, well within
+    the 120s API timeout.
     """
     if len(changed_passages) > max_passages:
-        print(f"  [scoring] capping at {max_passages} passages (found {len(changed_passages)})")
+        print(
+            f"  [scoring] capping at {max_passages} passages (found {len(changed_passages)}) "
+            f"— consider raising max_passages if this ticker has unusually dense diffs",
+            flush=True,
+        )
         changed_passages = changed_passages[:max_passages]
 
     total = len(changed_passages)
@@ -91,7 +100,7 @@ def score_all(changed_passages: list[dict], max_passages: int = 30) -> list[dict
         except Exception as e:
             return idx, {**passage, "score": None, "direction": None, "explanation": f"scoring error: {e}"}
 
-    with ThreadPoolExecutor(max_workers=5) as pool:
+    with ThreadPoolExecutor(max_workers=8) as pool:
         futures = {pool.submit(_score_one, i, p): i for i, p in enumerate(changed_passages)}
         for done_count, future in enumerate(as_completed(futures), 1):
             idx, result = future.result()
