@@ -45,6 +45,11 @@ def extract_sections(filing) -> dict:
         risk_factors  → stub pointer; use aif_text (Annual Information Form, ~150K chars).
         management_discussion → empty; use mda_text if attached, else blank.
         legal_proceedings → works directly.
+    - 10-Q: section numbering differs from 10-K; TenQ has no convenience properties.
+        item_1a → Part II, Item 1A (risk factor updates — often brief/unchanged)
+        item_7  → Part I,  Item 2 (MD&A — most substantive quarterly section)
+        item_3  → Part II, Item 1 (Legal Proceedings — MUST use get_item_with_part;
+                  plain doc['Item 1'] returns Part I Item 1 = Financial Statements)
     """
     time.sleep(RATE_LIMIT_DELAY)
     doc = filing.obj()
@@ -58,6 +63,19 @@ def extract_sections(filing) -> dict:
             # MD&A may be filed as a separate exhibit; empty if not present
             "item_7": _to_str(getattr(doc, "mda_text", None)),
             "item_3": _to_str(getattr(doc, "legal_proceedings", None)),
+        }
+
+    if type(doc).__name__ == "TenQ":
+        return {
+            "filing_date": str(filing.filing_date),
+            "accession_number": str(filing.accession_number),
+            # Part II, Item 1A — risk factor updates (often "no material changes")
+            "item_1a": _to_str(doc.get_item_with_part("Part II", "Item 1A")),
+            # Part I, Item 2 — MD&A (most important section in a 10-Q)
+            "item_7": _to_str(doc.get_item_with_part("Part I", "Item 2")),
+            # Part II, Item 1 — Legal Proceedings (must be part-qualified to avoid
+            # returning Part I Item 1 = Financial Statements)
+            "item_3": _to_str(doc.get_item_with_part("Part II", "Item 1")),
         }
 
     return {

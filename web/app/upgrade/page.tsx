@@ -19,19 +19,19 @@ const PRO_FEATURES: Feature[] = [
   { label: "Everything in Free" },
   {
     label: "Footnote AI",
-    detail: "Ask anything about the filing you're reading — find topic-specific changes, explain language shifts, or search across all passages at once in plain English.",
+    detail: "Ask anything about the diff in plain English. Find topic-specific changes, explain language shifts, search across all passages at once.",
   },
   {
     label: "Full intelligence report",
-    detail: "Executive summary, key concerns, reassurances, management sentiment, and business outlook — synthesized from every change in the filing.",
+    detail: "Concerns, reassurances, management sentiment, and business outlook synthesized from every change in the filing.",
   },
   {
     label: "Historical filing timeline",
-    detail: "Explore any consecutive filing pair going back 10+ years. Spot the exact year language started shifting.",
+    detail: "Diff any consecutive pair going back 10+ years. See exactly when language started shifting.",
   },
   {
     label: "10-Q quarterly diffs + word-level view",
-    detail: "Track language changes in quarterly filings, not just annual 10-Ks. Inline word diff shows exactly what was added or removed within a passage.",
+    detail: "Track quarterly filings, not just annual 10-Ks. Inline word diff shows what changed within a passage.",
   },
   { label: "Unlimited watchlist" },
   { label: "Email alerts when filings change (adjustable threshold)" },

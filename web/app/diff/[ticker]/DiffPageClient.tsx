@@ -185,7 +185,6 @@ function AnalysisPanel({
   onSelectPassage: (idx: number) => void;
   unscoredCount: number;
   scoringMore: boolean;
-  onScoreMore: () => void;
 }) {
   const [showAllConcerns, setShowAllConcerns] = useState(false);
   const [showAllReassurances, setShowAllReassurances] = useState(false);
@@ -453,31 +452,23 @@ function AnalysisPanel({
           </button>
         )}
 
-        {/* Ongoing background scoring indicator */}
+        {/* Background scoring indicator */}
         {(unscoredCount > 0 || scoringMore) && (
-          <div className="flex items-center justify-between gap-3 py-1">
-            <div className="flex items-center gap-2">
-              {scoringMore ? (
-                <div className="flex gap-1">
-                  {[0,1,2].map((i) => (
-                    <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
-                  ))}
-                </div>
-              ) : (
-                <div className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
-              )}
-              <p className="text-xs text-text-muted">
-                {scoringMore
-                  ? `Analyzing ${unscoredCount} more change${unscoredCount !== 1 ? "s" : ""}…`
-                  : `${unscoredCount} change${unscoredCount !== 1 ? "s" : ""} pending analysis`}
-              </p>
-            </div>
-            {!scoringMore && (
-              <button onClick={onScoreMore}
-                className="text-xs font-medium text-accent hover:text-accent-bright transition-colors shrink-0">
-                Analyze now
-              </button>
+          <div className="flex items-center gap-2 py-1">
+            {scoringMore ? (
+              <div className="flex gap-1">
+                {[0,1,2].map((i) => (
+                  <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                ))}
+              </div>
+            ) : (
+              <div className="w-1.5 h-1.5 rounded-full bg-text-muted/40" />
             )}
+            <p className="text-xs text-text-muted">
+              {scoringMore
+                ? `Scoring ${unscoredCount} remaining change${unscoredCount !== 1 ? "s" : ""}…`
+                : `${unscoredCount} change${unscoredCount !== 1 ? "s" : ""} not yet scored`}
+            </p>
           </div>
         )}
 
@@ -1130,7 +1121,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 onSelectPassage={selectPassageFromAnalysis}
                 unscoredCount={unscoredCount}
                 scoringMore={scoringMore}
-                onScoreMore={scoreMore}
               />
             </div>
 
