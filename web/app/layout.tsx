@@ -60,7 +60,7 @@ export default function RootLayout({
       >
         <body className="min-h-full flex flex-col bg-bg-base text-text-primary antialiased">
           <Script
-            src="https://www.googletagmanager.com/gtag/js?id=G-BG7H9ME68C"
+            src="https://www.googletagmanager.com/gtag/js?id=G-15PQKR6E84"
             strategy="afterInteractive"
           />
           <Script id="gtag-init" strategy="afterInteractive">
@@ -68,7 +68,7 @@ export default function RootLayout({
               window.dataLayer = window.dataLayer || [];
               function gtag(){dataLayer.push(arguments);}
               gtag('js', new Date());
-              gtag('config', 'G-BG7H9ME68C');
+              gtag('config', 'G-15PQKR6E84');
             `}
           </Script>
           {children}
