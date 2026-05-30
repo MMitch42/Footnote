@@ -138,9 +138,11 @@ def get_recent(limit: int = 8):
                 "date_old": row["filing_date_old"],
                 "scores": [],
                 "directions": [],
+                "total_passages": 0,
                 "computed_at": row.get("computed_at", ""),
             }
         for p in (row.get("changed_passages") or []):
+            pairs[key]["total_passages"] += 1
             if p.get("score") is not None:
                 pairs[key]["scores"].append(p["score"])
             if p.get("direction"):
@@ -160,7 +162,7 @@ def get_recent(limit: int = 8):
             "date_new": pair["date_new"],
             "date_old": pair["date_old"],
             "max_score": max(scores),
-            "n_changes": len(scores),
+            "n_changes": pair["total_passages"],
             "direction": "escalating" if esc > rea else "reassuring" if rea > esc else "neutral",
             "computed_at": pair["computed_at"],
         })

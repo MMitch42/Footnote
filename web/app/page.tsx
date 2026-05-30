@@ -194,6 +194,69 @@ export default function Home() {
     } catch { /* noop */ }
   };
 
+  // Shared feed row renderer — used in both signed-in and signed-out positions
+  const renderFeedRows = () => recentFeed.map((entry, i) => {
+    const borderColor =
+      entry.max_score >= 9 ? "border-l-[#f87171]" :
+      entry.max_score >= 7 ? "border-l-accent" :
+      entry.max_score >= 4 ? "border-l-[#d97706]" : "border-l-transparent";
+    const scoreColor =
+      entry.max_score >= 9 ? "text-[#f87171]" :
+      entry.max_score >= 7 ? "text-accent" :
+      entry.max_score >= 4 ? "text-[#d97706]" : "text-text-muted";
+    const scoreBg =
+      entry.max_score >= 9 ? "bg-[#f87171]/10" :
+      entry.max_score >= 7 ? "bg-accent/10" :
+      entry.max_score >= 4 ? "bg-[#d97706]/10" : "bg-bg-surface";
+    const scoreLabel =
+      entry.max_score >= 9 ? "Critical" :
+      entry.max_score >= 7 ? "High" :
+      entry.max_score >= 4 ? "Notable" : "Low";
+    const dirLabel =
+      entry.direction === "escalating" ? "↑ Escalating" :
+      entry.direction === "reassuring"  ? "↓ Reassuring" : null;
+    const dirColor =
+      entry.direction === "escalating" ? "text-[#f87171]" :
+      entry.direction === "reassuring"  ? "text-diff-add-text" : "";
+
+    return (
+      <button
+        key={i}
+        onClick={() => router.push(`/diff/${entry.ticker}${entry.filing_type === "10-Q" ? "?type=10-Q" : ""}`)}
+        className={`w-full text-left pl-4 pr-5 py-3.5 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group border-l-2 ${borderColor}`}
+      >
+        <div className="flex items-center gap-2 min-w-0 flex-1">
+          {entry.company_name ? (
+            <>
+              <span className="text-sm font-semibold text-text-primary truncate max-w-[140px] sm:max-w-[220px]">{entry.company_name}</span>
+              <span className="font-mono text-xs text-text-muted shrink-0">({entry.ticker})</span>
+            </>
+          ) : (
+            <span className="font-mono text-sm font-bold text-text-primary shrink-0">{entry.ticker}</span>
+          )}
+          <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase shrink-0">{entry.filing_type}</span>
+        </div>
+        <div className={`flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full ${scoreBg}`}>
+          <span className={`font-mono text-xs font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
+          <span className={`text-xs hidden sm:inline ${scoreColor} ml-0.5`}>{scoreLabel}</span>
+        </div>
+        <span className={`text-xs shrink-0 ${dirColor || "text-text-muted"}`}>
+          <span className="sm:hidden">
+            {entry.direction === "escalating" ? "↑" : entry.direction === "reassuring" ? "↓" : "—"}
+          </span>
+          <span className="hidden sm:inline">{dirLabel ?? "Neutral"}</span>
+        </span>
+        <span className="font-mono text-xs text-text-muted hidden sm:block shrink-0">
+          {entry.date_old} <span className="text-accent">→</span> {entry.date_new}
+        </span>
+        <span className="text-xs text-text-muted hidden md:block w-20 text-right shrink-0">
+          {entry.n_changes} change{entry.n_changes !== 1 ? "s" : ""}
+        </span>
+        <span className="text-text-muted group-hover:text-accent transition-colors text-sm shrink-0">→</span>
+      </button>
+    );
+  });
+
   return (
     <div className="min-h-screen bg-bg-base">
 
@@ -213,12 +276,6 @@ export default function Home() {
               >
                 Watchlist
               </a>
-              <UserButton
-                appearance={{
-                  variables: { colorPrimary: "#f59e0b" },
-                  elements: { avatarBox: "w-7 h-7" },
-                }}
-              />
             </Show>
           </div>
 
@@ -249,6 +306,12 @@ export default function Home() {
                 Get Pro →
               </a>
             )}
+            <UserButton
+              appearance={{
+                variables: { colorPrimary: "#f59e0b" },
+                elements: { avatarBox: "w-8 h-8" },
+              }}
+            />
           </Show>
         </div>
       </nav>
@@ -423,32 +486,21 @@ export default function Home() {
           </div>
         )}
 
-        {/* ── Recent changes feed ─────────────────────────────── */}
-        {(feedLoading || recentFeed.length > 0 || isSignedIn) && (
-          <div className={isSignedIn ? "py-10" : "border-t border-bg-border py-14"}>
-            {/* Section header */}
-            {isSignedIn ? (
-              <div className="mb-6">
-                <h2 className="text-base font-semibold text-text-primary flex items-center gap-2.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse inline-block shrink-0" />
-                  What changed this week
-                  {recentFeed.length > 0 && !feedLoading && (
-                    <span className="font-mono text-[10px] text-text-muted bg-bg-surface border border-bg-border rounded px-1.5 py-0.5 leading-none">
-                      {recentFeed.length} filing{recentFeed.length !== 1 ? "s" : ""}
-                    </span>
-                  )}
-                </h2>
-                <p className="text-xs text-text-muted mt-1">Sorted by materiality score — click any row to read the full diff</p>
-              </div>
-            ) : (
-              <div className="flex items-center gap-3 mb-6">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                  <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Recent filing changes</span>
-                </div>
-                <div className="h-px flex-1 bg-bg-border" />
-              </div>
-            )}
+        {/* ── Recent changes feed — signed-in dashboard position ── */}
+        {isSignedIn && (feedLoading || recentFeed.length > 0) && (
+          <div className="py-10">
+            <div className="mb-6">
+              <h2 className="text-base font-semibold text-text-primary flex items-center gap-2.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse inline-block shrink-0" />
+                Latest filing analyses
+                {recentFeed.length > 0 && !feedLoading && (
+                  <span className="font-mono text-[10px] text-text-muted bg-bg-surface border border-bg-border rounded px-1.5 py-0.5 leading-none">
+                    {recentFeed.length} filing{recentFeed.length !== 1 ? "s" : ""}
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-text-muted mt-1">Sorted by materiality score — click any row to read the full diff</p>
+            </div>
 
             {feedLoading ? (
               <div className="space-y-2">
@@ -458,84 +510,12 @@ export default function Home() {
               </div>
             ) : recentFeed.length === 0 ? (
               <div className="rounded-xl border border-bg-border px-6 py-10 text-center">
-                <p className="text-sm text-text-muted">No new filing changes this week.</p>
+                <p className="text-sm text-text-muted">No recent filing analyses yet.</p>
                 <p className="text-xs text-text-muted mt-1 opacity-60">Check back soon — we process new filings daily.</p>
               </div>
             ) : (
               <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
-                {recentFeed.map((entry, i) => {
-                  const borderColor =
-                    entry.max_score >= 9 ? "border-l-[#f87171]" :
-                    entry.max_score >= 7 ? "border-l-accent" :
-                    entry.max_score >= 4 ? "border-l-[#d97706]" : "border-l-transparent";
-                  const scoreColor =
-                    entry.max_score >= 9 ? "text-[#f87171]" :
-                    entry.max_score >= 7 ? "text-accent" :
-                    entry.max_score >= 4 ? "text-[#d97706]" : "text-text-muted";
-                  const scoreBg =
-                    entry.max_score >= 9 ? "bg-[#f87171]/10" :
-                    entry.max_score >= 7 ? "bg-accent/10" :
-                    entry.max_score >= 4 ? "bg-[#d97706]/10" : "bg-bg-surface";
-                  const scoreLabel =
-                    entry.max_score >= 9 ? "Critical" :
-                    entry.max_score >= 7 ? "High" :
-                    entry.max_score >= 4 ? "Notable" : "Low";
-                  const dirLabel =
-                    entry.direction === "escalating" ? "↑ Escalating" :
-                    entry.direction === "reassuring"  ? "↓ Reassuring" : null;
-                  const dirColor =
-                    entry.direction === "escalating" ? "text-[#f87171]" :
-                    entry.direction === "reassuring"  ? "text-diff-add-text" : "";
-
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => router.push(`/diff/${entry.ticker}${entry.filing_type === "10-Q" ? "?type=10-Q" : ""}`)}
-                      className={`w-full text-left pl-4 pr-5 py-3.5 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group border-l-2 ${borderColor}`}
-                    >
-                      {/* Company name + ticker + type */}
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        {entry.company_name ? (
-                          <>
-                            <span className="text-sm font-semibold text-text-primary truncate max-w-[140px] sm:max-w-[220px]">{entry.company_name}</span>
-                            <span className="font-mono text-xs text-text-muted shrink-0">({entry.ticker})</span>
-                          </>
-                        ) : (
-                          <span className="font-mono text-sm font-bold text-text-primary shrink-0">{entry.ticker}</span>
-                        )}
-                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase shrink-0">{entry.filing_type}</span>
-                      </div>
-
-                      {/* Score pill */}
-                      <div className={`flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full ${scoreBg}`}>
-                        <span className={`font-mono text-xs font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
-                        <span className={`text-xs hidden sm:inline ${scoreColor} ml-0.5`}>{scoreLabel}</span>
-                      </div>
-
-                      {/* Direction */}
-                      <span className={`text-xs shrink-0 ${dirColor || "text-text-muted"}`}>
-                        <span className="sm:hidden">
-                          {entry.direction === "escalating" ? "↑" : entry.direction === "reassuring" ? "↓" : "—"}
-                        </span>
-                        <span className="hidden sm:inline">
-                          {dirLabel ?? "Neutral"}
-                        </span>
-                      </span>
-
-                      {/* Date range */}
-                      <span className="font-mono text-xs text-text-muted hidden sm:block shrink-0">
-                        {entry.date_old} <span className="text-accent">→</span> {entry.date_new}
-                      </span>
-
-                      {/* Changes count */}
-                      <span className="text-xs text-text-muted hidden md:block w-20 text-right shrink-0">
-                        {entry.n_changes} change{entry.n_changes !== 1 ? "s" : ""}
-                      </span>
-
-                      <span className="text-text-muted group-hover:text-accent transition-colors text-sm shrink-0">→</span>
-                    </button>
-                  );
-                })}
+                {renderFeedRows()}
               </div>
             )}
           </div>
@@ -657,6 +637,31 @@ export default function Home() {
             ))}
           </div>
         </div>}
+
+        {/* ── Recent filing changes feed — signed-out position ─── */}
+        {!isSignedIn && (feedLoading || recentFeed.length > 0) && (
+          <div className="border-t border-bg-border py-14">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Recent filing changes</span>
+              </div>
+              <div className="h-px flex-1 bg-bg-border" />
+            </div>
+
+            {feedLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 rounded-lg bg-bg-surface animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
+                ))}
+              </div>
+            ) : recentFeed.length === 0 ? null : (
+              <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
+                {renderFeedRows()}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Real example — marketing only */}
         {!isSignedIn && <div ref={demoRef} className={`border-t border-bg-border py-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
