@@ -788,7 +788,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   };
 
   const allPassages: Passage[] = data
-    ? Object.entries(data.sections)
+    ? Object.entries(data.sections ?? {})
         .flatMap(([section, diff]) => (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section })))
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     : [];
@@ -919,11 +919,12 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
         setRefreshStatus("done");
         setTimeout(() => setRefreshStatus("idle"), 2000);
       } else {
+        console.error("[verify] failed — status:", res.status, "body:", updated);
         setRefreshStatus("error");
         setTimeout(() => setRefreshStatus("idle"), 3000);
       }
     } catch (e) {
-      console.error("[verify] failed:", e);
+      console.error("[verify] fetch threw:", e);
       setRefreshStatus("error");
       setTimeout(() => setRefreshStatus("idle"), 3000);
     } finally {
@@ -951,7 +952,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const selected = selectedIdx !== null ? searched[selectedIdx] ?? null : null;
 
   const sectionCounts = data
-    ? Object.fromEntries(Object.entries(data.sections).map(([k, v]) => [k, (v as SectionDiff).changed_passages.length]))
+    ? Object.fromEntries(Object.entries(data.sections ?? {}).map(([k, v]) => [k, (v as SectionDiff).changed_passages.length]))
     : {};
 
   // Keyboard navigation (only active on Changes tab)
