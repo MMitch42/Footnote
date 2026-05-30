@@ -29,6 +29,7 @@ export function ChatWidget() {
   const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
   const [diffCtx, setDiffCtx] = useState<DiffContextData | null>(getDiffContext);
   const [chatHeight, setChatHeight] = useState(520);
+  const [expanded, setExpanded] = useState(false);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const isDraggingChat = useRef(false);
@@ -58,6 +59,29 @@ export function ChatWidget() {
     };
     document.addEventListener("mousemove", onMove);
     document.addEventListener("mouseup", onUp);
+  };
+
+  const toggleExpanded = () => {
+    setExpanded((e) => {
+      if (!e) {
+        // Expanding — bump height to at least 640
+        setChatHeight((h) => Math.max(h, 640));
+      } else {
+        // Collapsing — snap back to default
+        setChatHeight(520);
+      }
+      return !e;
+    });
+  };
+
+  // Derived sizing tokens — everything scales together
+  const sz = {
+    msgText:    expanded ? "text-sm"     : "text-xs",
+    inputText:  expanded ? "text-sm"     : "text-xs",
+    hintText:   expanded ? "text-sm"     : "text-xs",
+    jumpText:   expanded ? "text-xs"     : "text-[10px]",
+    px:         expanded ? "px-5"        : "px-4",
+    py:         expanded ? "py-4"        : "py-3",
   };
 
   // Extract ticker from URL (fallback when diff hasn't loaded yet)
@@ -132,7 +156,11 @@ export function ChatWidget() {
       {/* Panel */}
       {open && (
         <div
-          className="fixed bottom-[92px] right-3 w-[calc(100vw-24px)] sm:bottom-[152px] sm:right-24 sm:w-[400px] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden"
+          className={`fixed bottom-[92px] right-3 w-[calc(100vw-24px)] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden transition-[width] duration-200 ${
+            expanded
+              ? "sm:bottom-[88px] sm:right-6 sm:w-[600px]"
+              : "sm:bottom-[152px] sm:right-24 sm:w-[400px]"
+          }`}
           style={{ height: chatHeight }}
         >
           {/* Drag-to-resize handle — top edge */}
@@ -144,8 +172,16 @@ export function ChatWidget() {
           </div>
 
           {/* Header */}
-          <div className="shrink-0 px-4 py-2.5 border-b border-bg-border flex items-center justify-between bg-bg-raised">
+          <div className="shrink-0 px-3 py-2.5 border-b border-bg-border flex items-center justify-between bg-bg-raised">
             <div className="flex items-center gap-2">
+              {/* Expand / collapse toggle — top-left */}
+              <button
+                onClick={toggleExpanded}
+                title={expanded ? "Compact view" : "Expand"}
+                className="text-text-muted hover:text-text-primary transition-colors leading-none select-none text-sm"
+              >
+                {expanded ? "⤡" : "⤢"}
+              </button>
               <div className="w-1.5 h-1.5 rounded-full bg-accent" />
               <span className="font-mono text-xs font-bold text-text-primary tracking-widest uppercase">
                 Footnote AI
@@ -213,10 +249,10 @@ export function ChatWidget() {
           ) : (
             <>
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-3 min-h-0">
+              <div className={`flex-1 overflow-y-auto ${sz.px} ${sz.py} space-y-3 min-h-0`}>
                 {messages.length === 0 ? (
                   <div className="space-y-2">
-                    <p className="text-xs text-text-muted pb-1">
+                    <p className={`${sz.hintText} text-text-muted pb-1`}>
                       {diffCtx
                         ? `Gemini has read the full diff for ${diffCtx.companyName ?? diffCtx.ticker} — ask anything about what changed.`
                         : ticker
@@ -227,7 +263,7 @@ export function ChatWidget() {
                       <button
                         key={s}
                         onClick={() => send(s)}
-                        className="w-full text-left text-xs px-3 py-2 rounded-lg border border-bg-border text-text-muted hover:border-accent/50 hover:text-text-secondary transition-colors"
+                        className={`w-full text-left ${sz.msgText} px-3 py-2 rounded-lg border border-bg-border text-text-muted hover:border-accent/50 hover:text-text-secondary transition-colors`}
                       >
                         {s}
                       </button>
@@ -238,7 +274,7 @@ export function ChatWidget() {
                     <div key={i} className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}>
                       <div className="flex flex-col gap-1 max-w-[88%]">
                         <div
-                          className={`px-3 py-2 rounded-xl text-xs leading-relaxed whitespace-pre-wrap ${
+                          className={`px-3 py-2 rounded-xl ${sz.msgText} leading-relaxed whitespace-pre-wrap ${
                             m.role === "user"
                               ? "bg-accent text-bg-base font-medium"
                               : "bg-bg-raised text-text-secondary border border-bg-border"
@@ -249,7 +285,7 @@ export function ChatWidget() {
                         {m.role === "assistant" && m.passageIdx !== undefined && diffCtx && (
                           <button
                             onClick={() => requestPassageNavigation(m.passageIdx!)}
-                            className="self-start ml-1 flex items-center gap-1 text-[10px] font-semibold text-accent hover:text-accent-bright transition-colors"
+                            className={`self-start ml-1 flex items-center gap-1 ${sz.jumpText} font-semibold text-accent hover:text-accent-bright transition-colors`}
                           >
                             <span>→</span>
                             <span>View passage {m.passageIdx + 1}</span>
@@ -285,12 +321,12 @@ export function ChatWidget() {
                   }}
                   placeholder={ticker ? `Ask about ${ticker}…` : "Ask about SEC filings…"}
                   disabled={loading}
-                  className="flex-1 bg-transparent text-xs text-text-primary placeholder:text-text-muted focus:outline-none disabled:opacity-50"
+                  className={`flex-1 bg-transparent ${sz.inputText} text-text-primary placeholder:text-text-muted focus:outline-none disabled:opacity-50`}
                 />
                 <button
                   onClick={() => send(input)}
                   disabled={!input.trim() || loading}
-                  className="text-xs font-semibold text-accent hover:text-accent-bright transition-colors disabled:opacity-30 shrink-0"
+                  className={`${sz.inputText} font-semibold text-accent hover:text-accent-bright transition-colors disabled:opacity-30 shrink-0`}
                 >
                   Send
                 </button>
