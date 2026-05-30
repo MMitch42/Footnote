@@ -156,7 +156,7 @@ export function ChatWidget() {
       {/* Panel */}
       {open && (
         <div
-          className={`fixed bottom-[92px] right-3 w-[calc(100vw-24px)] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden transition-[width] duration-200 ${
+          className={`fixed bottom-[92px] right-3 w-[calc(100vw-24px)] bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden transition-[width] duration-200 max-h-[calc(100dvh-150px)] ${
             expanded
               ? "sm:bottom-[88px] sm:right-6 sm:w-[600px]"
               : "sm:bottom-[152px] sm:right-24 sm:w-[400px]"

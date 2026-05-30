@@ -985,7 +985,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               FOOTNOTE
             </Link>
             <span className="text-text-muted">/</span>
-            <span className="font-mono text-sm text-accent uppercase tracking-wider truncate max-w-[180px]">
+            <span className="font-mono text-sm text-accent uppercase tracking-wider truncate max-w-[100px] sm:max-w-[180px]">
               {data?.company_name && data.company_name !== ticker.toUpperCase()
                 ? data.company_name
                 : ticker.toUpperCase()}

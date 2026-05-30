@@ -56,7 +56,9 @@ export default function Page() {
         </span>
         <p className="text-sm text-text-muted mt-1">SEC Filing Intelligence</p>
       </div>
-      <SignIn appearance={clerkAppearance} />
+      {/* fallbackRedirectUrl sends users with no watchlist to onboarding;
+          the onboarding page skips itself if they already have entries */}
+      <SignIn appearance={clerkAppearance} fallbackRedirectUrl="/onboarding" />
     </div>
   );
 }

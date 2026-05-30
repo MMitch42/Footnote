@@ -47,13 +47,31 @@ export const metadata: Metadata = {
   },
 };
 
+const clerkLocalization = {
+  userProfile: {
+    start: {
+      passwordSection: {
+        // "Set password" appears for OAuth users who want a backup login method.
+        // Adding context makes this less confusing.
+        title: "Password",
+        primaryButton__setPassword: "Add backup password (optional)",
+        primaryButton__updatePassword: "Update password",
+      },
+      dangerSection: {
+        title: "Danger zone",
+        deleteAccountButton: "Delete my Footnote account",
+      },
+    },
+  },
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
   return (
-    <ClerkProvider>
+    <ClerkProvider localization={clerkLocalization}>
       <html
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable} h-full`}

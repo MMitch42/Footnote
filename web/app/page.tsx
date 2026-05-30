@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Show, UserButton } from "@clerk/nextjs";
+import { Show, UserButton, useUser } from "@clerk/nextjs";
 
 function useInView(threshold = 0.12) {
   const ref = useRef<HTMLDivElement>(null);
@@ -55,7 +55,9 @@ export default function Home() {
   const [submitted, setSubmitted] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
   const [filingType, setFilingType] = useState<"10-K" | "10-Q">("10-K");
+  const [watchlistItems, setWatchlistItems] = useState<{ ticker: string }[]>([]);
   const router = useRouter();
+  const { isSignedIn } = useUser();
 
   useEffect(() => {
     fetch("/api/subscription")
@@ -64,10 +66,20 @@ export default function Home() {
       .catch(() => setPlan("free"));
   }, []);
 
-  // Typewriter
+  // Watchlist chips for signed-in users
+  useEffect(() => {
+    if (!isSignedIn) return;
+    fetch("/api/watchlist")
+      .then((r) => r.ok ? r.json() : [])
+      .then((d) => setWatchlistItems(Array.isArray(d) ? d.slice(0, 8) : []))
+      .catch(() => {});
+  }, [isSignedIn]);
+
+  // Typewriter — only for marketing (non-signed-in) view
   const [typed, setTyped] = useState("");
   const [typingDone, setTypingDone] = useState(false);
   useEffect(() => {
+    if (isSignedIn) { setTyped(HEADLINE); setTypingDone(true); return; }
     let i = 0;
     const id = setInterval(() => {
       i++;
@@ -75,7 +87,7 @@ export default function Home() {
       if (i >= HEADLINE.length) { setTypingDone(true); clearInterval(id); }
     }, 38);
     return () => clearInterval(id);
-  }, []);
+  }, [isSignedIn]);
 
   // Counter for 22% stat
   const { ref: statsRef, inView: statsInView } = useInView();
@@ -245,16 +257,30 @@ export default function Home() {
           className="absolute inset-0 pointer-events-none"
           style={{ background: "radial-gradient(ellipse 90% 60% at 50% -5%, rgba(245,158,11,0.09) 0%, transparent 65%)" }}
         />
-        <div className="relative z-10 max-w-5xl mx-auto px-6 pt-20 pb-16">
-          <h1 className="font-mono text-4xl font-bold text-text-primary leading-tight mb-5 max-w-xl whitespace-pre-line">
-            {typed}{!typingDone && <span className="text-accent animate-pulse">_</span>}
-          </h1>
-          <p className="text-base text-text-secondary leading-relaxed mb-10 max-w-lg">
-            Every time a company files a new 10-K or 10-Q, Footnote compares it to the previous one.
-            Changed passages are scored for significance. When something material shifts in the risk factors,
-            MD&amp;A, or legal disclosures, you find out.
-          </p>
+        <div className={`relative z-10 max-w-5xl mx-auto px-6 pb-16 ${isSignedIn ? "pt-12" : "pt-20"}`}>
 
+          {/* Dashboard header — signed-in users */}
+          {isSignedIn ? (
+            <>
+              <p className="font-mono text-[10px] text-accent uppercase tracking-widest mb-3">Dashboard</p>
+              <h1 className="font-mono text-2xl font-bold text-text-primary leading-tight mb-6">
+                What changed this week?
+              </h1>
+            </>
+          ) : (
+            <>
+              <h1 className="font-mono text-4xl font-bold text-text-primary leading-tight mb-5 max-w-xl whitespace-pre-line">
+                {typed}{!typingDone && <span className="text-accent animate-pulse">_</span>}
+              </h1>
+              <p className="text-base text-text-secondary leading-relaxed mb-10 max-w-lg">
+                Every time a company files a new 10-K or 10-Q, Footnote compares it to the previous one.
+                Changed passages are scored for significance. When something material shifts in the risk factors,
+                MD&amp;A, or legal disclosures, you find out.
+              </p>
+            </>
+          )}
+
+          {/* Search box */}
           <div ref={searchRef} className="relative max-w-sm">
             <form onSubmit={handleSearch} className="flex">
               <input
@@ -294,7 +320,8 @@ export default function Home() {
               </div>
             )}
           </div>
-          {/* Filing type toggle — Pro only; free users always get 10-K */}
+
+          {/* Filing type toggle — Pro only */}
           {(plan === "pro" || plan === "research") && (
             <div className="flex items-center gap-1.5 mt-2.5">
               {(["10-K", "10-Q"] as const).map((type) => (
@@ -313,9 +340,35 @@ export default function Home() {
               ))}
             </div>
           )}
-          <p className="text-xs text-text-muted mt-2">
-            Any public company. See exactly what changed in their last filing.
-          </p>
+
+          {/* Watchlist chips — signed-in dashboard */}
+          {isSignedIn && watchlistItems.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 mt-4">
+              <span className="text-xs text-text-muted">Watchlist:</span>
+              {watchlistItems.map((item) => (
+                <a
+                  key={item.ticker}
+                  href={`/diff/${item.ticker}`}
+                  className="font-mono text-xs px-2.5 py-1 rounded border border-bg-border text-text-secondary hover:border-accent/50 hover:text-accent transition-colors duration-150"
+                >
+                  {item.ticker}
+                </a>
+              ))}
+              <a
+                href="/watchlist"
+                className="text-xs text-text-muted hover:text-accent transition-colors duration-150 ml-1"
+              >
+                Manage →
+              </a>
+            </div>
+          )}
+
+          {/* "Any public company" hint — marketing view only */}
+          {!isSignedIn && (
+            <p className="text-xs text-text-muted mt-2">
+              Any public company. See exactly what changed in their last filing.
+            </p>
+          )}
         </div>
       </div>
 
@@ -360,8 +413,8 @@ export default function Home() {
           </div>
         </div>
 
-        {/* How it works */}
-        <div ref={howRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+        {/* How it works — marketing only */}
+        {!isSignedIn && <div ref={howRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">How it works</p>
           <p className="text-sm text-text-secondary mb-10 max-w-lg">
             Built for investors, analysts, and anyone who tracks public companies. No more manually reading filings to see what changed.
@@ -377,7 +430,7 @@ export default function Home() {
               </div>
             ))}
           </div>
-        </div>
+        </div>}
 
         {/* Recent filing changes feed */}
         {(feedLoading || recentFeed.length > 0) && (
@@ -475,8 +528,8 @@ export default function Home() {
           </div>
         )}
 
-        {/* Real example — static, pre-baked */}
-        <div ref={demoRef} className={`border-t border-bg-border py-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+        {/* Real example — marketing only */}
+        {!isSignedIn && <div ref={demoRef} className={`border-t border-bg-border py-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Real example</span>
             <div className="h-px flex-1 bg-bg-border" />
@@ -527,48 +580,66 @@ export default function Home() {
               <p className="text-sm text-text-secondary leading-relaxed">{DEMO.explanation}</p>
             </div>
           </div>
-        </div>
+        </div>}
 
-        {/* Pricing / Waitlist */}
+        {/* Bottom CTA — adapts to auth state */}
         <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-150 ${waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 max-w-2xl">
-            {/* Pro CTA */}
-            <div>
-              <p className="text-lg font-semibold text-text-primary mb-1">Ready to get started?</p>
-              <p className="text-sm text-text-muted mb-4">Full synthesis reports, unlimited watchlist, and weekly email alerts.</p>
-              <a
-                href="/upgrade"
-                className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
-              >
-                See Pro plan →
-              </a>
+          {isSignedIn ? (
+            /* Signed-in: show upgrade nudge (free) or nothing (pro) */
+            plan === "free" ? (
+              <div className="max-w-lg">
+                <p className="text-lg font-semibold text-text-primary mb-1">Ready for personalized alerts?</p>
+                <p className="text-sm text-text-muted mb-4">
+                  Pro gives you instant email alerts when your watched companies file, unlimited watchlist, and Footnote AI across every diff.
+                  Early access: $9/month, locked in for life.
+                </p>
+                <a
+                  href="/upgrade"
+                  className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
+                >
+                  Upgrade to Pro →
+                </a>
+              </div>
+            ) : null
+          ) : (
+            /* Signed-out: marketing CTAs */
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 max-w-2xl">
+              <div>
+                <p className="text-lg font-semibold text-text-primary mb-1">Ready to get started?</p>
+                <p className="text-sm text-text-muted mb-4">Full synthesis reports, unlimited watchlist, and weekly email alerts.</p>
+                <a
+                  href="/upgrade"
+                  className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
+                >
+                  See Pro plan →
+                </a>
+              </div>
+              <div>
+                <p className="text-lg font-semibold text-text-primary mb-1">Not ready yet?</p>
+                <p className="text-sm text-text-muted mb-4">Leave your email — we&apos;ll notify you when new features ship.</p>
+                {submitted ? (
+                  <p className="text-sm text-diff-add-text">Got it. We&apos;ll be in touch.</p>
+                ) : (
+                  <form onSubmit={handleWaitlist} className="flex max-w-sm">
+                    <input
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      placeholder="your@email.com"
+                      className="flex-1 h-10 px-3 bg-bg-surface border border-bg-border border-r-0 rounded-l text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors duration-150"
+                    />
+                    <button
+                      type="submit"
+                      className="px-5 h-10 bg-text-primary text-bg-base text-sm font-semibold rounded-r hover:bg-text-primary/90 transition-colors duration-150 whitespace-nowrap"
+                    >
+                      Join
+                    </button>
+                  </form>
+                )}
+              </div>
             </div>
-            {/* Waitlist */}
-            <div>
-              <p className="text-lg font-semibold text-text-primary mb-1">Not ready yet?</p>
-              <p className="text-sm text-text-muted mb-4">Leave your email — we&apos;ll notify you when new features ship.</p>
-              {submitted ? (
-                <p className="text-sm text-diff-add-text">Got it. We&apos;ll be in touch.</p>
-              ) : (
-                <form onSubmit={handleWaitlist} className="flex max-w-sm">
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="your@email.com"
-                    className="flex-1 h-10 px-3 bg-bg-surface border border-bg-border border-r-0 rounded-l text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent transition-colors duration-150"
-                  />
-                  <button
-                    type="submit"
-                    className="px-5 h-10 bg-text-primary text-bg-base text-sm font-semibold rounded-r hover:bg-text-primary/90 transition-colors duration-150 whitespace-nowrap"
-                  >
-                    Join
-                  </button>
-                </form>
-              )}
-            </div>
-          </div>
+          )}
         </div>
 
       </div>{/* /max-w-5xl */}

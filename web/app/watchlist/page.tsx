@@ -303,8 +303,17 @@ function WatchlistContent() {
             </div>
           ) : items.length === 0 ? (
             <div className="rounded-xl border border-bg-border px-6 py-10 text-center">
-              <p className="text-sm text-text-muted mb-1">No tickers yet.</p>
-              <p className="text-xs text-text-muted">Add a ticker above to start tracking filing changes.</p>
+              <p className="text-sm text-text-muted mb-2">No companies yet.</p>
+              {plan === "free" ? (
+                <a
+                  href="/onboarding"
+                  className="inline-flex items-center gap-1.5 text-sm font-semibold text-accent hover:text-accent-bright transition-colors"
+                >
+                  Set up your alerts →
+                </a>
+              ) : (
+                <p className="text-xs text-text-muted">Add a ticker above to start tracking filing changes.</p>
+              )}
             </div>
           ) : (() => {
             const q = listFilter.trim().toLowerCase();

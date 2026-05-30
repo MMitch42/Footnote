@@ -203,10 +203,204 @@ export async function GET(req: Request) {
     }
   }
 
-  return Response.json({ ok: true, sent, errors: errors.length ? errors : undefined });
+  console.log(`[weekly-digest] pro digest done, sent=${sent}`);
+
+  // === Free digest — editorial top-3 for all free users ===
+  // 1. Pull all diffs from the past 7 days regardless of watchlist
+  const { data: globalDiffs } = await sb
+    .from("diffs")
+    .select("ticker, filing_type, filing_date_new, filing_date_old, changed_passages")
+    .gte("filing_date_new", cutoff)
+    .neq("section", "synthesis")
+    .order("filing_date_new", { ascending: false })
+    .limit(500);
+
+  const globalSummaryMap: Record<string, TickerSummary> = {};
+  for (const row of (globalDiffs ?? []) as DiffRow[]) {
+    const key = `${row.ticker}||${row.filing_date_new}||${row.filing_date_old}`;
+    const passages = row.changed_passages ?? [];
+    const scores = passages.map((p) => p.score ?? 0);
+    const maxScore = scores.length ? Math.max(...scores) : 0;
+    const highCount = passages.filter((p) => (p.score ?? 0) >= 7).length;
+    const esc = passages.filter((p) => p.direction === "escalating").length;
+    const rea = passages.filter((p) => p.direction === "reassuring").length;
+    const direction: "escalating" | "reassuring" | "neutral" =
+      esc > rea ? "escalating" : rea > esc ? "reassuring" : "neutral";
+    const topPassage = [...passages].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0];
+
+    if (!globalSummaryMap[key]) {
+      globalSummaryMap[key] = {
+        ticker: row.ticker,
+        filing_type: row.filing_type,
+        date_new: row.filing_date_new,
+        date_old: row.filing_date_old,
+        maxScore,
+        nChanges: passages.length,
+        highCount,
+        direction,
+        topExplanation: topPassage?.explanation ?? null,
+      };
+    } else {
+      globalSummaryMap[key].maxScore = Math.max(globalSummaryMap[key].maxScore, maxScore);
+      globalSummaryMap[key].nChanges += passages.length;
+      globalSummaryMap[key].highCount += highCount;
+      if (esc > rea) globalSummaryMap[key].direction = "escalating";
+      else if (rea > esc && globalSummaryMap[key].direction !== "escalating")
+        globalSummaryMap[key].direction = "reassuring";
+      if (!globalSummaryMap[key].topExplanation && topPassage?.explanation)
+        globalSummaryMap[key].topExplanation = topPassage.explanation;
+    }
+  }
+
+  const topFilings = Object.values(globalSummaryMap)
+    .filter((s) => s.maxScore >= 5)
+    .sort((a, b) => b.maxScore - a.maxScore)
+    .slice(0, 3);
+
+  let freeSent = 0;
+  const freeErrors: string[] = [];
+
+  if (topFilings.length > 0) {
+    // 2. Get all Clerk users; skip Pro/Research users (they already got personalized digest)
+    const { data: allClerkUsers } = await clerk.users.getUserList({ limit: 500 });
+    const highestScore = topFilings[0]?.maxScore ?? 0;
+
+    for (const user of allClerkUsers) {
+      if (proUserIds.has(user.id)) continue; // Pro users have their own digest
+      const userEmail = user.emailAddresses[0]?.emailAddress;
+      if (!userEmail) continue;
+
+      const subject =
+        highestScore >= 9
+          ? `🔴 Critical change flagged this week — ${topFilings[0].ticker}`
+          : highestScore >= 7
+          ? `This week's top filing changes on Footnote`
+          : `What changed in SEC filings this week`;
+
+      try {
+        await resend.emails.send({
+          from: "Footnote <onboarding@resend.dev>",
+          to: userEmail,
+          subject,
+          html: buildFreeDigestEmail({ topFilings }),
+        });
+        freeSent++;
+      } catch (e) {
+        freeErrors.push(`${user.id}: ${e}`);
+      }
+    }
+    console.log(`[weekly-digest] free digest sent to ${freeSent} users`);
+  } else {
+    console.log("[weekly-digest] no notable filings this week — skipping free digest");
+  }
+
+  return Response.json({
+    ok: true,
+    sent,
+    freeSent,
+    errors: [...errors, ...freeErrors].length ? [...errors, ...freeErrors] : undefined,
+  });
 }
 
-/* ── Email HTML ─────────────────────────────────────────────── */
+/* ── Free digest email ──────────────────────────────────────── */
+function buildFreeDigestEmail({ topFilings }: { topFilings: TickerSummary[] }): string {
+  const now = new Date();
+  const weekEnd = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+  const rows = topFilings.map((s, i) => {
+    const color = scoreColor(s.maxScore);
+    const label = scoreLabel(s.maxScore);
+    const dirIcon = s.direction === "escalating" ? "↑" : s.direction === "reassuring" ? "↓" : "·";
+    const dirColor = s.direction === "escalating" ? "#f87171" : s.direction === "reassuring" ? "#34d399" : "#6b7280";
+    const diffUrl = `${APP_URL}/diff/${s.ticker}`;
+    const teaser = s.topExplanation
+      ? `<p style="margin:6px 0 0;font-size:12px;color:#9ca3af;line-height:1.5;padding-left:10px;border-left:2px solid #1f1f1f;">${s.topExplanation}</p>`
+      : "";
+
+    return `
+      <tr>
+        <td style="padding:14px 0;border-bottom:${i < topFilings.length - 1 ? "1px solid #1a1a1a" : "none"};vertical-align:top;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            <tr>
+              <td>
+                <span style="font-family:monospace;font-size:15px;font-weight:700;color:#f59e0b;">${s.ticker}</span>
+                <span style="font-family:monospace;font-size:11px;color:#4b5563;margin-left:8px;text-transform:uppercase;">${s.filing_type}</span>
+              </td>
+              <td align="right">
+                <span style="font-family:monospace;font-size:11px;font-weight:700;color:${color};">${s.maxScore}/10 ${label}</span>
+                <span style="font-size:11px;color:${dirColor};margin-left:6px;">${dirIcon}</span>
+              </td>
+            </tr>
+            <tr>
+              <td colspan="2" style="padding-top:2px;">
+                <span style="font-family:monospace;font-size:11px;color:#4b5563;">${s.date_old} → ${s.date_new} · ${s.nChanges} change${s.nChanges !== 1 ? "s" : ""}</span>
+              </td>
+            </tr>
+          </table>
+          ${teaser}
+          <p style="margin:8px 0 0;">
+            <a href="${diffUrl}" style="font-size:12px;color:#f59e0b;text-decoration:none;font-family:monospace;">View analysis →</a>
+            <span style="font-size:11px;color:#374151;margin-left:6px;">(sign in required)</span>
+          </p>
+        </td>
+      </tr>`;
+  }).join("");
+
+  return `<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background-color:#0a0a0a;">
+  <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background:#0a0a0a;">
+    <tr><td align="center" style="padding:40px 16px;">
+      <table width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+
+        <tr><td style="padding-bottom:24px;">
+          <p style="margin:0;font-family:monospace;font-size:16px;font-weight:700;color:#f0f0f0;letter-spacing:0.05em;">FOOTNOTE</p>
+          <p style="margin:3px 0 0;font-family:monospace;font-size:11px;color:#4b5563;text-transform:uppercase;letter-spacing:0.1em;">Market Pulse · ${weekEnd}</p>
+        </td></tr>
+
+        <tr><td style="padding-bottom:18px;">
+          <p style="margin:0;font-size:13px;color:#9ca3af;line-height:1.6;">
+            This week&apos;s top SEC filing changes across all public companies — scored by semantic novelty, not text volume.
+          </p>
+        </td></tr>
+
+        <tr><td style="height:1px;background:#1a1a1a;"></td></tr>
+        <tr><td style="height:8px;"></td></tr>
+
+        <tr><td>
+          <table width="100%" cellpadding="0" cellspacing="0">${rows}</table>
+        </td></tr>
+
+        <tr><td style="height:28px;"></td></tr>
+
+        <!-- Upgrade CTA -->
+        <tr><td style="padding:18px;background:#111111;border:1px solid #1f1f1f;border-radius:8px;text-align:center;">
+          <p style="margin:0 0 6px;font-size:13px;font-weight:600;color:#f0f0f0;">Get alerted the moment your stocks file.</p>
+          <p style="margin:0 0 14px;font-size:12px;color:#9ca3af;">Pro members get personalized weekly digests + instant email alerts for their watchlist. Early access: $9/month, locked in for life.</p>
+          <a href="${APP_URL}/upgrade"
+             style="display:inline-block;background:#f59e0b;color:#0a0a0a;padding:10px 22px;border-radius:6px;text-decoration:none;font-size:13px;font-weight:700;font-family:monospace;">
+            Upgrade to Pro →
+          </a>
+        </td></tr>
+
+        <tr><td style="height:32px;"></td></tr>
+
+        <tr><td style="border-top:1px solid #1a1a1a;padding-top:16px;">
+          <p style="margin:0;font-size:10px;color:#374151;line-height:1.6;">
+            You&apos;re on the free plan. <a href="${APP_URL}/upgrade" style="color:#4b5563;">Upgrade to Pro</a> for your personalized watchlist digest.
+            Not financial advice. For informational purposes only.
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+/* ── Pro digest email ────────────────────────────────────────── */
 function scoreColor(score: number): string {
   if (score >= 9) return "#f87171";
   if (score >= 7) return "#f59e0b";
