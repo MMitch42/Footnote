@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ContactButton } from "@/components/ContactButton";
 
 export const metadata = { title: "Terms of Service | Footnote" };
 
@@ -114,9 +115,9 @@ export default function TermsPage() {
             <h2 className="font-semibold text-text-primary mb-2">9. Contact</h2>
             <p>
               Questions about these Terms:{" "}
-              <a href="mailto:mitchell.magid@gmail.com" className="text-accent hover:text-accent-bright transition-colors">
-                mitchell.magid@gmail.com
-              </a>
+              <ContactButton className="text-accent hover:text-accent-bright transition-colors underline">
+                send us a message
+              </ContactButton>.
             </p>
           </section>
 

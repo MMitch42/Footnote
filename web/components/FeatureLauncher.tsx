@@ -3,6 +3,12 @@
 import { useEffect, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
+import {
+  getFeatureLauncherOpen,
+  setFeatureLauncherOpen,
+  subscribeFeatureLauncher,
+  type FeatureLauncherView,
+} from "@/lib/featureLauncherStore";
 
 type Plan = "free" | "pro" | "research" | null;
 type WatchedTicker = { ticker: string };
@@ -10,8 +16,10 @@ type Company = { ticker: string; name: string };
 type PanelView = "menu" | "feedback";
 
 export function FeatureLauncher() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => getFeatureLauncherOpen());
   const [view, setView] = useState<PanelView>("menu");
+
+  // ← NOTE: PanelView === FeatureLauncherView, both are "menu" | "feedback"
   const [plan, setPlan] = useState<Plan>(null);
   const [watchlist, setWatchlist] = useState<WatchedTicker[]>([]);
   const [query, setQuery] = useState("");
@@ -27,7 +35,12 @@ export function FeatureLauncher() {
   const inputRef = useRef<HTMLInputElement>(null);
   const feedbackRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
-  const buttonRef = useRef<HTMLButtonElement>(null);
+
+  // Sync local state with the module store (nav buttons / contact links write to the store)
+  useEffect(() => subscribeFeatureLauncher((open, view) => {
+    setOpen(open);
+    setView(view as PanelView);
+  }), []);
   const { isSignedIn, isLoaded, user } = useUser();
   const pathname = usePathname();
   const router = useRouter();
@@ -76,16 +89,16 @@ export function FeatureLauncher() {
     return () => clearTimeout(id);
   }, [query]);
 
-  // Close on outside click — exclude the toggle button to avoid mousedown/click race
+  // Close on outside click — exclude elements marked data-launcher-trigger
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      const target = e.target as Node;
+      const target = e.target as Element;
       if (
         panelRef.current && !panelRef.current.contains(target) &&
-        buttonRef.current && !buttonRef.current.contains(target)
+        !target.closest("[data-launcher-trigger]")
       ) {
-        setOpen(false);
+        setFeatureLauncherOpen(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -94,13 +107,8 @@ export function FeatureLauncher() {
 
   // ── Early returns after all hooks ──
 
-  // Hide on auth / legal pages
-  if (
-    !pathname ||
-    pathname.startsWith("/sign-") ||
-    pathname.startsWith("/terms") ||
-    pathname.startsWith("/privacy")
-  ) {
+  // Hide on auth pages only
+  if (!pathname || pathname.startsWith("/sign-")) {
     return null;
   }
 
@@ -113,7 +121,7 @@ export function FeatureLauncher() {
   const bodyText     = "text-[11px] text-text-secondary leading-relaxed";
   const bodyDim      = "text-[11px] text-text-muted leading-relaxed";
 
-  const go = (path: string) => { setOpen(false); setQuery(""); setSuggestions([]); router.push(path); };
+  const go = (path: string) => { setFeatureLauncherOpen(false); setQuery(""); setSuggestions([]); router.push(path); };
   const analyzeTicker = (ticker: string) => go(`/diff/${ticker.toUpperCase()}`);
 
   const openFeedback = () => {
@@ -138,11 +146,11 @@ export function FeatureLauncher() {
         }),
       });
       setFeedbackDone(true);
-      setTimeout(() => setOpen(false), 2200);
+      setTimeout(() => setFeatureLauncherOpen(false), 2200);
     } catch {
       // Don't error out — silently fail and close
       setFeedbackDone(true);
-      setTimeout(() => setOpen(false), 2200);
+      setTimeout(() => setFeatureLauncherOpen(false), 2200);
     } finally {
       setFeedbackSubmitting(false);
     }
@@ -151,7 +159,7 @@ export function FeatureLauncher() {
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "ArrowDown") { e.preventDefault(); setActiveIdx((i) => Math.min(i + 1, suggestions.length - 1)); }
     if (e.key === "ArrowUp")   { e.preventDefault(); setActiveIdx((i) => Math.max(i - 1, -1)); }
-    if (e.key === "Escape")    { setOpen(false); }
+    if (e.key === "Escape")    { setFeatureLauncherOpen(false); }
     if (e.key === "Enter") {
       e.preventDefault();
       const pick = activeIdx >= 0 ? suggestions[activeIdx] : suggestions[0];
@@ -379,16 +387,6 @@ export function FeatureLauncher() {
         </div>
       )}
 
-      {/* ── Toggle button ── */}
-      <button
-        ref={buttonRef}
-        onClick={() => setOpen((o) => !o)}
-        className="fixed top-2 left-2 sm:top-2.5 sm:left-3 w-8 h-8 bg-accent text-bg-base rounded-md shadow-md hover:bg-accent-bright transition-all duration-150 z-50 flex items-center justify-center text-sm font-bold select-none"
-        title="Menu"
-        aria-label="Open feature menu"
-      >
-        {open ? "✕" : "≡"}
-      </button>
     </>
   );
 }

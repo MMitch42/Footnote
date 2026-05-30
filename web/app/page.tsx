@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Show, UserButton, useUser } from "@clerk/nextjs";
+import { toggleFeatureLauncher, openFeatureLauncherFeedback } from "@/lib/featureLauncherStore";
 
 function useInView(threshold = 0.12) {
   const ref = useRef<HTMLDivElement>(null);
@@ -265,6 +266,15 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-6 h-12 flex items-center gap-6">
           {/* Logo + nav — grouped left, breadcrumb style */}
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              data-launcher-trigger="true"
+              onClick={toggleFeatureLauncher}
+              className="w-8 h-8 bg-accent text-bg-base rounded-md flex items-center justify-center text-sm font-bold hover:bg-accent-bright transition-colors shrink-0"
+              title="Menu"
+              aria-label="Open menu"
+            >
+              ≡
+            </button>
             <a href="/" className="font-mono text-sm font-bold text-text-primary tracking-tight hover:text-accent transition-colors duration-150">
               FOOTNOTE
             </a>
@@ -784,7 +794,7 @@ export default function Home() {
         <div className="max-w-5xl mx-auto px-6 flex items-center justify-end flex-wrap gap-6">
           <a href="/terms" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Terms</a>
           <a href="/privacy" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Privacy</a>
-          <a href="mailto:mitchell.magid@gmail.com" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Contact</a>
+          <button onClick={openFeatureLauncherFeedback} className="text-xs text-text-muted hover:text-text-secondary transition-colors">Contact</button>
         </div>
       </div>
 

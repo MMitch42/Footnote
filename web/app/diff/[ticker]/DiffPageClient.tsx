@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Show, UserButton } from "@clerk/nextjs";
 import { setDiffContext, subscribeNavigation, getNavigationRequest } from "@/lib/diffContext";
+import { toggleFeatureLauncher } from "@/lib/featureLauncherStore";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -981,6 +982,15 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
       <nav className="shrink-0 border-b border-bg-border bg-bg-base">
         <div className="px-6 h-10 flex items-center justify-between">
           <div className="flex items-center gap-3">
+            <button
+              data-launcher-trigger="true"
+              onClick={toggleFeatureLauncher}
+              className="w-7 h-7 bg-accent text-bg-base rounded flex items-center justify-center text-sm font-bold hover:bg-accent-bright transition-colors shrink-0"
+              title="Menu"
+              aria-label="Open menu"
+            >
+              ≡
+            </button>
             <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors duration-150">
               FOOTNOTE
             </Link>
@@ -1212,7 +1222,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
                 activeTab === "changes" ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
               }`}>
-              Changes · {allPassages.length}
+              Changes · {allPassages.length}{scoringMore ? " …" : ""}
             </button>
           </div>
 
@@ -1274,6 +1284,23 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                     );
                   })}
                 </div>
+                {/* Scoring status chip */}
+                {scoringMore ? (
+                  <div className="shrink-0 flex items-center px-3 border-l border-bg-border gap-1.5">
+                    <div className="flex gap-0.5">
+                      {[0,1,2].map((i) => (
+                        <div key={i} className="w-1 h-1 bg-accent rounded-full animate-bounce" style={{ animationDelay: `${i * 150}ms` }} />
+                      ))}
+                    </div>
+                    <span className="text-[10px] text-text-muted whitespace-nowrap">
+                      {unscoredCount > 0 ? `Scoring ${unscoredCount} more…` : "Updating…"}
+                    </span>
+                  </div>
+                ) : unscoredCount === 0 && allPassages.length > 0 ? (
+                  <div className="shrink-0 flex items-center px-3 border-l border-bg-border">
+                    <span className="text-[10px] text-text-muted" title="All changes have been scored">✓ {allPassages.length} total</span>
+                  </div>
+                ) : null}
                 {/* Search input — always visible */}
                 <div className="shrink-0 flex items-center px-2 border-l border-bg-border">
                   <input

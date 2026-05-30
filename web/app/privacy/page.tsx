@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ContactButton } from "@/components/ContactButton";
 
 export const metadata = { title: "Privacy Policy | Footnote" };
 
@@ -118,10 +119,10 @@ export default function PrivacyPage() {
               <li>Opt out of email alerts by removing tickers from your watchlist</li>
             </ul>
             <p className="mt-3">
-              To exercise any of these rights, email{" "}
-              <a href="mailto:mitchell.magid@gmail.com" className="text-accent hover:text-accent-bright transition-colors">
-                mitchell.magid@gmail.com
-              </a>.
+              To exercise any of these rights,{" "}
+              <ContactButton className="text-accent hover:text-accent-bright transition-colors underline">
+                contact us
+              </ContactButton>.
             </p>
           </section>
 
@@ -148,9 +149,9 @@ export default function PrivacyPage() {
             <h2 className="font-semibold text-text-primary mb-2">9. Contact</h2>
             <p>
               Privacy questions or data requests:{" "}
-              <a href="mailto:mitchell.magid@gmail.com" className="text-accent hover:text-accent-bright transition-colors">
-                mitchell.magid@gmail.com
-              </a>
+              <ContactButton className="text-accent hover:text-accent-bright transition-colors underline">
+                send us a message
+              </ContactButton>.
             </p>
           </section>
 
