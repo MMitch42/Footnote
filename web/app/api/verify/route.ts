@@ -1,5 +1,7 @@
 import { auth } from "@clerk/nextjs/server";
 
+export const maxDuration = 180; // EDGAR fetch + re-diff can take a while
+
 const API_URL = process.env.API_URL ?? "http://localhost:8000";
 
 export async function POST(req: Request) {

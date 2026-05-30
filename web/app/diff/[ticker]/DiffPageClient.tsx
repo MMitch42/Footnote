@@ -610,6 +610,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const [watchLoading, setWatchLoading] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research">("free");
   const [scoringMore, setScoringMore] = useState(false);
+  const [refreshStatus, setRefreshStatus] = useState<"idle" | "done" | "error">("idle");
   // Track which diffs we've already auto-scored / recomputed so we don't loop
   const autoScoredRef = useRef<Set<string>>(new Set());
   const recomputedRef = useRef<Set<string>>(new Set());
@@ -905,6 +906,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const verifyCount = async () => {
     if (!data || scoringMore) return;
     setScoringMore(true);
+    setRefreshStatus("idle");
     try {
       const res = await fetch("/api/verify", {
         method: "POST",
@@ -912,9 +914,18 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
         body: JSON.stringify({ ticker: data.ticker, form: data.filing_type }),
       });
       const updated: DiffResult = await res.json();
-      if (res.ok && !updated.error) _applyUpdatedDiff(updated);
+      if (res.ok && !updated.error) {
+        _applyUpdatedDiff(updated);
+        setRefreshStatus("done");
+        setTimeout(() => setRefreshStatus("idle"), 2000);
+      } else {
+        setRefreshStatus("error");
+        setTimeout(() => setRefreshStatus("idle"), 3000);
+      }
     } catch (e) {
       console.error("[verify] failed:", e);
+      setRefreshStatus("error");
+      setTimeout(() => setRefreshStatus("idle"), 3000);
     } finally {
       setScoringMore(false);
     }
@@ -1037,10 +1048,15 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 <button
                   onClick={verifyCount}
                   disabled={scoringMore}
-                  title="Re-diff from EDGAR to verify the change count is complete. Free if nothing changed — only scores if new passages are found."
-                  className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150 disabled:opacity-40 hidden sm:block"
+                  className={`text-xs transition-colors duration-150 disabled:opacity-40 hidden sm:block ${
+                    refreshStatus === "done"
+                      ? "text-diff-add-text"
+                      : refreshStatus === "error"
+                      ? "text-diff-rem-text/70"
+                      : "text-text-muted hover:text-text-secondary"
+                  }`}
                 >
-                  {scoringMore ? "…" : "↺ Refresh"}
+                  {scoringMore ? "…" : refreshStatus === "done" ? "✓ Refreshed" : refreshStatus === "error" ? "✗ Failed" : "↺ Refresh"}
                 </button>
               )}
               <Link href="/watchlist" className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">Watchlist</Link>
