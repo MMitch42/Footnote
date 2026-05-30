@@ -1002,7 +1002,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               <Link href="/watchlist" className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">Watchlist</Link>
               {plan === "free" && (
                 <a href="/upgrade" className="text-xs font-semibold px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap">
-                  Get Pro
+                  Get Pro →
                 </a>
               )}
               <UserButton appearance={{ variables: { colorPrimary: "#f59e0b" }, elements: { avatarBox: "w-7 h-7" } }} />

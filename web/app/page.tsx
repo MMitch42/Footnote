@@ -56,6 +56,7 @@ export default function Home() {
   const [plan, setPlan] = useState<"free" | "pro" | "research" | null>(null);
   const [filingType, setFilingType] = useState<"10-K" | "10-Q">("10-K");
   const [watchlistItems, setWatchlistItems] = useState<{ ticker: string }[]>([]);
+  const [watchlistLoading, setWatchlistLoading] = useState(true);
   const router = useRouter();
   const { isSignedIn } = useUser();
 
@@ -66,13 +67,13 @@ export default function Home() {
       .catch(() => setPlan("free"));
   }, []);
 
-  // Watchlist chips for signed-in users
+  // Watchlist for signed-in dashboard
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isSignedIn) { setWatchlistLoading(false); return; }
     fetch("/api/watchlist")
       .then((r) => r.ok ? r.json() : [])
-      .then((d) => setWatchlistItems(Array.isArray(d) ? d.slice(0, 8) : []))
-      .catch(() => {});
+      .then((d) => { setWatchlistItems(Array.isArray(d) ? d.slice(0, 8) : []); setWatchlistLoading(false); })
+      .catch(() => setWatchlistLoading(false));
   }, [isSignedIn]);
 
   // Typewriter — only for marketing (non-signed-in) view
@@ -199,20 +200,21 @@ export default function Home() {
       {/* Nav */}
       <nav className="relative z-10 border-b border-bg-border">
         <div className="max-w-5xl mx-auto px-6 h-12 flex items-center gap-6">
-          {/* Logo */}
-          <a href="/" className="font-mono text-sm font-bold text-text-primary tracking-tight hover:text-accent transition-colors duration-150 shrink-0">
-            FOOTNOTE
-          </a>
-
-          {/* Left nav links — sit right next to the logo */}
-          <Show when="signed-in">
-            <a
-              href="/watchlist"
-              className="text-sm text-text-muted hover:text-text-primary transition-colors duration-150"
-            >
-              Watchlist
+          {/* Logo + nav — grouped left, breadcrumb style */}
+          <div className="flex items-center gap-2 shrink-0">
+            <a href="/" className="font-mono text-sm font-bold text-text-primary tracking-tight hover:text-accent transition-colors duration-150">
+              FOOTNOTE
             </a>
-          </Show>
+            <Show when="signed-in">
+              <span className="text-text-muted/40 font-mono text-sm">/</span>
+              <a
+                href="/watchlist"
+                className="font-mono text-sm text-text-muted hover:text-text-primary transition-colors duration-150"
+              >
+                Watchlist
+              </a>
+            </Show>
+          </div>
 
           {/* Spacer */}
           <div className="flex-1" />
@@ -238,7 +240,7 @@ export default function Home() {
                 href="/upgrade"
                 className="text-sm font-semibold px-4 h-8 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap"
               >
-                Upgrade
+                Get Pro →
               </a>
             )}
             <UserButton
@@ -341,28 +343,6 @@ export default function Home() {
             </div>
           )}
 
-          {/* Watchlist chips — signed-in dashboard */}
-          {isSignedIn && watchlistItems.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2 mt-4">
-              <span className="text-xs text-text-muted">Watchlist:</span>
-              {watchlistItems.map((item) => (
-                <a
-                  key={item.ticker}
-                  href={`/diff/${item.ticker}`}
-                  className="font-mono text-xs px-2.5 py-1 rounded border border-bg-border text-text-secondary hover:border-accent/50 hover:text-accent transition-colors duration-150"
-                >
-                  {item.ticker}
-                </a>
-              ))}
-              <a
-                href="/watchlist"
-                className="text-xs text-text-muted hover:text-accent transition-colors duration-150 ml-1"
-              >
-                Manage →
-              </a>
-            </div>
-          )}
-
           {/* "Any public company" hint — marketing view only */}
           {!isSignedIn && (
             <p className="text-xs text-text-muted mt-2">
@@ -374,44 +354,156 @@ export default function Home() {
 
       <div className="max-w-5xl mx-auto px-6">
 
-        {/* Signal / Alpha stats */}
-        <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10">
-          <div>
-            <p className="font-mono text-5xl font-bold text-text-primary mb-1 tabular-nums">
-              {pct}<span className="text-accent">%</span>
-            </p>
-            <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-4">annual alpha, peer-reviewed</p>
-            <p className="text-sm text-text-secondary leading-relaxed mb-3">
-              A long-short strategy on 10-K language changes generates ~22% annual abnormal return. Companies that quietly rewrite their filings significantly underperform those that don&apos;t.
-            </p>
-            <p className="text-xs text-text-muted leading-relaxed">
-              Cohen, Malloy &amp; Nguyen, &ldquo;Lazy Prices,&rdquo; <em>Journal of Finance</em>, 2020.
-              Institutional research platforms charge up to $15,000/year for this signal.
-            </p>
-          </div>
-          <div className="pt-10 sm:pt-0 border-t border-bg-border sm:border-t-0 sm:border-l sm:pl-10 flex flex-col justify-center">
-            <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-4">Footnote Pro</p>
-            <div className="space-y-3">
-              <div>
-                <div className="flex items-end gap-2 mb-1">
-                  <span className="font-mono text-3xl font-bold text-text-primary">$9</span>
-                  <span className="text-sm text-text-secondary mb-1">/month</span>
-                  <span className="text-sm text-text-secondary line-through mb-1">$29</span>
-                </div>
-                <p className="text-xs font-semibold text-accent">Early access. Locked in for life.</p>
+        {/* ── Watchlist panel — dashboard only ─────────────────── */}
+        {isSignedIn && (
+          <div className="py-8 border-b border-bg-border">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Your watchlist</span>
+                {!watchlistLoading && watchlistItems.length > 0 && (
+                  <span className="font-mono text-[10px] text-text-muted bg-bg-surface border border-bg-border rounded px-1.5 py-0.5 leading-none">
+                    {watchlistItems.length}
+                  </span>
+                )}
               </div>
-              <a
-                href="/upgrade"
-                className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
-              >
-                Subscribe →
+              <a href="/watchlist" className="text-xs text-text-muted hover:text-accent transition-colors duration-150">
+                Manage →
               </a>
-              <p className="text-xs text-text-muted leading-relaxed max-w-[200px]">
-                Full intelligence reports, unlimited watchlist, email alerts, and Footnote AI.
+            </div>
+
+            {watchlistLoading ? (
+              <div className="flex flex-wrap gap-2">
+                {[80, 64, 72].map((w, i) => (
+                  <div
+                    key={i}
+                    className="h-9 rounded-lg bg-bg-surface animate-pulse"
+                    style={{ width: w, opacity: 1 - i * 0.25 }}
+                  />
+                ))}
+              </div>
+            ) : watchlistItems.length === 0 ? (
+              <div className="rounded-xl border border-bg-border border-dashed px-6 py-7 flex flex-col sm:flex-row items-center gap-4 sm:gap-6">
+                <div className="w-9 h-9 rounded-full bg-bg-surface border border-bg-border flex items-center justify-center shrink-0">
+                  <span className="text-accent text-sm leading-none">✦</span>
+                </div>
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-sm font-medium text-text-primary mb-0.5">No companies tracked yet</p>
+                  <p className="text-xs text-text-muted">Add tickers to get email alerts whenever they file.</p>
+                </div>
+                <a
+                  href="/onboarding"
+                  className="inline-flex items-center text-sm font-semibold px-4 h-8 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors shrink-0"
+                >
+                  Set up watchlist →
+                </a>
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {watchlistItems.map((item) => (
+                  <a
+                    key={item.ticker}
+                    href={`/diff/${item.ticker}`}
+                    className="group font-mono text-sm font-medium px-4 py-2 rounded-lg border border-bg-border bg-bg-surface text-text-secondary hover:border-accent/50 hover:text-accent hover:bg-bg-raised transition-all duration-150 flex items-center gap-1.5"
+                  >
+                    {item.ticker}
+                    <span className="text-[10px] text-text-muted/50 group-hover:text-accent/50 transition-colors">→</span>
+                  </a>
+                ))}
+                {/* Add slot */}
+                {plan !== "pro" && plan !== "research" && watchlistItems.length >= 2 ? (
+                  <a
+                    href="/upgrade"
+                    className="font-mono text-sm px-4 py-2 rounded-lg border border-dashed border-accent/25 text-accent/50 hover:border-accent/50 hover:text-accent hover:bg-bg-raised transition-all duration-150"
+                  >
+                    + Upgrade for more
+                  </a>
+                ) : (
+                  <a
+                    href="/watchlist"
+                    className="font-mono text-sm px-4 py-2 rounded-lg border border-dashed border-bg-border text-text-muted hover:border-accent/40 hover:text-accent hover:bg-bg-raised transition-all duration-150"
+                  >
+                    + Add
+                  </a>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Signal / Alpha stats — hidden for Pro/Research ───── */}
+        {(plan !== "pro" && plan !== "research") && (
+          <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10">
+            <div>
+              <p className="font-mono text-5xl font-bold text-text-primary mb-1 tabular-nums">
+                {pct}<span className="text-accent">%</span>
+              </p>
+              <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-4">annual alpha, peer-reviewed</p>
+              <p className="text-sm text-text-secondary leading-relaxed mb-3">
+                A long-short strategy on 10-K language changes generates ~22% annual abnormal return. Companies that quietly rewrite their filings significantly underperform those that don&apos;t.
+              </p>
+              <p className="text-xs text-text-muted leading-relaxed">
+                Cohen, Malloy &amp; Nguyen, &ldquo;Lazy Prices,&rdquo; <em>Journal of Finance</em>, 2020.
+                Institutional research platforms charge up to $15,000/year for this signal.
               </p>
             </div>
+            <div className="pt-10 sm:pt-0 border-t border-bg-border sm:border-t-0 sm:border-l sm:pl-10 flex flex-col justify-center">
+              {isSignedIn && plan === "free" ? (
+                /* Signed-in free: feature list + upgrade */
+                <>
+                  <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-4">Unlock with Pro</p>
+                  <div className="space-y-2.5 mb-5">
+                    {[
+                      "Instant email alerts when companies file",
+                      "Unlimited watchlist (free: 2 companies)",
+                      "Footnote AI — ask questions about any diff",
+                      "Full synthesis reports on every filing",
+                    ].map((f) => (
+                      <div key={f} className="flex items-start gap-2.5">
+                        <span className="text-accent text-xs shrink-0 mt-0.5">✓</span>
+                        <span className="text-sm text-text-secondary">{f}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-end gap-2 mb-3">
+                    <span className="font-mono text-2xl font-bold text-text-primary">$9</span>
+                    <span className="text-sm text-text-secondary mb-0.5">/month</span>
+                    <span className="text-xs text-text-muted line-through mb-1">$29</span>
+                  </div>
+                  <a
+                    href="/upgrade"
+                    className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors self-start"
+                  >
+                    Upgrade to Pro →
+                  </a>
+                </>
+              ) : (
+                /* Signed-out: pricing card */
+                <>
+                  <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-4">Footnote Pro</p>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex items-end gap-2 mb-1">
+                        <span className="font-mono text-3xl font-bold text-text-primary">$9</span>
+                        <span className="text-sm text-text-secondary mb-1">/month</span>
+                        <span className="text-sm text-text-secondary line-through mb-1">$29</span>
+                      </div>
+                      <p className="text-xs font-semibold text-accent">Early access. Locked in for life.</p>
+                    </div>
+                    <a
+                      href="/upgrade"
+                      className="inline-flex items-center text-sm font-semibold px-4 h-9 bg-accent text-bg-base rounded-lg hover:bg-accent-bright transition-colors"
+                    >
+                      Subscribe →
+                    </a>
+                    <p className="text-xs text-text-muted leading-relaxed max-w-[200px]">
+                      Full intelligence reports, unlimited watchlist, email alerts, and Footnote AI.
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* How it works — marketing only */}
         {!isSignedIn && <div ref={howRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
@@ -433,7 +525,7 @@ export default function Home() {
         </div>}
 
         {/* Recent filing changes feed */}
-        {(feedLoading || recentFeed.length > 0) && (
+        {(feedLoading || recentFeed.length > 0 || isSignedIn) && (
           <div className="border-t border-bg-border py-14">
             <div className="flex items-center gap-3 mb-6">
               <div className="flex items-center gap-1.5">
@@ -448,6 +540,11 @@ export default function Home() {
                 {[0, 1, 2, 3].map((i) => (
                   <div key={i} className="h-11 rounded-lg bg-bg-surface animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
                 ))}
+              </div>
+            ) : recentFeed.length === 0 ? (
+              <div className="rounded-xl border border-bg-border px-6 py-10 text-center">
+                <p className="text-sm text-text-muted">No new filing changes this week.</p>
+                <p className="text-xs text-text-muted mt-1 opacity-60">Check back soon — we process new filings daily.</p>
               </div>
             ) : (
               <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
