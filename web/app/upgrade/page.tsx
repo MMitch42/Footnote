@@ -80,7 +80,7 @@ export default function UpgradePage() {
       {/* Nav */}
       <nav className="border-b border-bg-border">
         <div className="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between">
-          <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors ml-10">
+          <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors">
             FOOTNOTE
           </Link>
           <button onClick={() => router.back()} className="text-sm text-text-secondary hover:text-text-primary transition-colors">

@@ -12,7 +12,7 @@ Two pipeline modes:
 
 import fetcher as edgar_client
 import db
-from diff import compute_diff, filter_scorable
+from diff import compute_diff, filter_scorable, deduplicate_moves
 from scoring import score_all
 from synthesis import synthesize
 
@@ -30,6 +30,25 @@ FORM_FALLBACKS: dict[str, list[str]] = {
     "40-F": ["10-K", "20-F"],
     "10-Q": [],  # no structured foreign equivalent (6-K is not diffable)
 }
+
+
+def _remove_moved_paragraphs(section_diff: dict, ticker: str, section: str) -> tuple[dict, bool]:
+    """
+    Apply move-deduplication to a cached diff.
+    Paragraphs that were moved (appear as both a pure deletion and a near-identical
+    pure addition) are stripped — they represent reordering, not actual changes.
+    Returns (updated_diff, was_updated).  No-op if nothing was removed.
+    """
+    passages = section_diff.get("changed_passages", [])
+    deduped = deduplicate_moves(passages)
+    if len(deduped) == len(passages):
+        return section_diff, False
+    n_removed = len(passages) - len(deduped)
+    print(
+        f"  [pipeline] {ticker}/{section}: removed {n_removed} moved paragraph(s) from cache",
+        flush=True,
+    )
+    return {**section_diff, "changed_passages": deduped}, True
 
 
 def _should_cache(scored: list[dict]) -> bool:
@@ -101,8 +120,9 @@ def alert_mode(ticker: str, form: str = "10-K", sections: list = None) -> dict:
     for section in run_sections:
         cached = db.get_diff(ticker, actual_form, new_filing["filing_date"], old_filing["filing_date"], section)
         if cached:
-            cached, updated = _fill_missing_scores(cached, ticker, section)
-            if updated and _should_cache(cached["changed_passages"]):
+            cached, updated_scores = _fill_missing_scores(cached, ticker, section)
+            cached, removed_moves = _remove_moved_paragraphs(cached, ticker, section)
+            if (updated_scores or removed_moves) and _should_cache(cached["changed_passages"]):
                 db.upsert_diff(ticker, actual_form, new_filing["filing_date"], old_filing["filing_date"], section, cached)
             results[section] = cached
             continue
@@ -184,8 +204,9 @@ def historical_mode(ticker: str, form: str = "10-K", n: int = 10) -> list[dict]:
         for section in SECTIONS:
             cached = db.get_diff(ticker, form, date_new, date_old, section)
             if cached:
-                cached, updated = _fill_missing_scores(cached, ticker, section)
-                if updated and _should_cache(cached["changed_passages"]):
+                cached, updated_scores = _fill_missing_scores(cached, ticker, section)
+                cached, removed_moves = _remove_moved_paragraphs(cached, ticker, section)
+                if (updated_scores or removed_moves) and _should_cache(cached["changed_passages"]):
                     db.upsert_diff(ticker, form, date_new, date_old, section, cached)
                 pair_result["sections"][section] = cached
                 continue

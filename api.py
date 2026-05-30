@@ -104,6 +104,21 @@ def _run_historical(job_id: str, ticker: str, form: str, n: int):
         db.update_job(job_id, "error", {"error": str(e)})
 
 
+@app.post("/recompute/{ticker}")
+def recompute_diff(ticker: str, date_new: str, date_old: str, form: str = "10-K"):
+    """
+    Force-recompute a diff that was truncated by old pipeline logic (hard-cut at 60 passages
+    with no cap-skipped sentinels).  Deletes the stale cached rows for the specific filing pair
+    and re-runs alert_mode so the full passage set is scored and stored.
+    Returns the fresh result in the same shape as /alert/{ticker}.
+    """
+    ticker = ticker.upper()
+    print(f"[recompute] {ticker} {form} {date_new} vs {date_old} — purging stale cache", flush=True)
+    db.delete_diffs(ticker, form, date_new, date_old)
+    result = alert_mode(ticker, form=form)
+    return result
+
+
 @app.get("/recent")
 def get_recent(limit: int = 8):
     """

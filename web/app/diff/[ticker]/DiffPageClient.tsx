@@ -609,8 +609,9 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const [watchLoading, setWatchLoading] = useState(false);
   const [plan, setPlan] = useState<"free" | "pro" | "research">("free");
   const [scoringMore, setScoringMore] = useState(false);
-  // Track which diffs we've already auto-scored so we don't loop
+  // Track which diffs we've already auto-scored / recomputed so we don't loop
   const autoScoredRef = useRef<Set<string>>(new Set());
+  const recomputedRef = useRef<Set<string>>(new Set());
 
   // Draggable split between Analysis and Changes panels (desktop only)
   const [splitPct, setSplitPct] = useState(33);
@@ -722,6 +723,17 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     }).catch(() => {});
   }, [ticker]);
 
+  // Detect diffs cached before the cap-skipped sentinel pattern was introduced.
+  // Old pipeline hard-cut at 60 passages per section with all fully scored.
+  // With current pipeline, >=60 scorable passages always produces null-score sentinels —
+  // so no sentinels + count >=60 in any section reliably means legacy truncation.
+  const isLegacyTruncated = !loading && !!data && !data.error &&
+    Object.values(data.sections ?? {}).some((diff) => {
+      const passages = (diff as SectionDiff).changed_passages;
+      return passages.length >= 60 &&
+             !passages.some((p) => p.score === null && p.explanation === null);
+    });
+
   // Auto-score remaining passages in the background once initial load finishes.
   // Railway completes the job regardless of frontend timeout — results are in Supabase on next fresh load.
   useEffect(() => {
@@ -733,6 +745,18 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     return () => clearTimeout(timer);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, loading]);
+
+  // Auto-recompute diffs cached by old pipeline that hard-cut at 60 passages
+  // with no cap-skipped sentinels. Fires silently in the background like score-more.
+  useEffect(() => {
+    if (!isLegacyTruncated || !data || scoringMore) return;
+    const key = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
+    if (recomputedRef.current.has(key)) return;
+    recomputedRef.current.add(key);
+    const timer = setTimeout(() => recompute(), 800);
+    return () => clearTimeout(timer);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLegacyTruncated, data]);
 
   const switchFilingType = (type: "10-K" | "10-Q") => {
     if (type === filingType) return;
@@ -823,6 +847,55 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     }
   };
 
+  // Re-run the full diff for diffs that were hard-cut at 60 by old pipeline logic.
+  const recompute = async () => {
+    if (!data || scoringMore) return;
+    setScoringMore(true);
+    try {
+      const res = await fetch("/api/recompute", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ticker: data.ticker,
+          form: data.filing_type,
+          date_new: data.date_new,
+          date_old: data.date_old,
+        }),
+      });
+      const updated: DiffResult = await res.json();
+      if (res.ok && !updated.error) {
+        const cacheKey = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
+        _diffCache.set(cacheKey, updated);
+        setData(updated);
+        const allP = Object.entries(updated.sections ?? {})
+          .flatMap(([sec, diff]) =>
+            (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section: sec }))
+          )
+          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+        setDiffContext({
+          ticker: updated.ticker,
+          companyName: updated.company_name,
+          filingType: updated.filing_type,
+          dateNew: updated.date_new,
+          dateOld: updated.date_old,
+          synthesis: updated.synthesis ?? null,
+          topPassages: allP.slice(0, 25).map((p) => ({
+            old: p.old?.slice(0, 700) ?? "",
+            new: p.new?.slice(0, 700) ?? "",
+            score: p.score,
+            direction: p.direction,
+            explanation: p.explanation,
+            section: p.section,
+          })),
+        });
+      }
+    } catch (e) {
+      console.error("[recompute] failed:", e);
+    } finally {
+      setScoringMore(false);
+    }
+  };
+
   const filtered =
     filter === "all"  ? allPassages :
     filter === "high" ? highPassages :
@@ -907,7 +980,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
       {/* Nav */}
       <nav className="shrink-0 border-b border-bg-border bg-bg-base">
         <div className="px-6 h-10 flex items-center justify-between">
-          <div className="flex items-center gap-3 ml-10">
+          <div className="flex items-center gap-3">
             <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors duration-150">
               FOOTNOTE
             </Link>

@@ -169,7 +169,7 @@ function WatchlistContent() {
       {/* Nav */}
       <nav className="border-b border-bg-border">
         <div className="max-w-3xl mx-auto px-6 h-12 flex items-center justify-between">
-          <div className="flex items-center gap-3 ml-10">
+          <div className="flex items-center gap-3">
             <Link href="/" className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors duration-150">
               FOOTNOTE
             </Link>

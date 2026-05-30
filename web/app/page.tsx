@@ -186,46 +186,56 @@ export default function Home() {
 
       {/* Nav */}
       <nav className="relative z-10 border-b border-bg-border">
-        <div className="max-w-5xl mx-auto px-6 h-12 flex items-center justify-between">
-          <span className="font-mono text-sm font-bold text-text-primary tracking-tight ml-10">FOOTNOTE</span>
-          <div className="flex items-center gap-4">
-            <Show when="signed-out">
+        <div className="max-w-5xl mx-auto px-6 h-12 flex items-center gap-6">
+          {/* Logo */}
+          <a href="/" className="font-mono text-sm font-bold text-text-primary tracking-tight hover:text-accent transition-colors duration-150 shrink-0">
+            FOOTNOTE
+          </a>
+
+          {/* Left nav links — sit right next to the logo */}
+          <Show when="signed-in">
+            <a
+              href="/watchlist"
+              className="text-sm text-text-muted hover:text-text-primary transition-colors duration-150"
+            >
+              Watchlist
+            </a>
+          </Show>
+
+          {/* Spacer */}
+          <div className="flex-1" />
+
+          {/* Right actions */}
+          <Show when="signed-out">
+            <a
+              href="/sign-in"
+              className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
+            >
+              Sign in
+            </a>
+            <a
+              href="/sign-up"
+              className="text-sm font-medium px-4 h-8 flex items-center bg-text-primary text-bg-base rounded hover:bg-text-primary/90 transition-colors duration-150"
+            >
+              Sign up
+            </a>
+          </Show>
+          <Show when="signed-in">
+            {plan === "free" && (
               <a
-                href="/sign-in"
-                className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
+                href="/upgrade"
+                className="text-sm font-semibold px-4 h-8 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap"
               >
-                Sign in
+                Upgrade
               </a>
-              <a
-                href="/sign-up"
-                className="text-sm font-medium px-4 h-8 flex items-center bg-text-primary text-bg-base rounded hover:bg-text-primary/90 transition-colors duration-150"
-              >
-                Sign up
-              </a>
-            </Show>
-            <Show when="signed-in">
-              <a
-                href="/watchlist"
-                className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
-              >
-                Watchlist
-              </a>
-              {plan === "free" && (
-                <a
-                  href="/upgrade"
-                  className="text-sm font-semibold px-4 h-8 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap"
-                >
-                  Get Pro →
-                </a>
-              )}
-              <UserButton
-                appearance={{
-                  variables: { colorPrimary: "#f59e0b" },
-                  elements: { avatarBox: "w-8 h-8" },
-                }}
-              />
-            </Show>
-          </div>
+            )}
+            <UserButton
+              appearance={{
+                variables: { colorPrimary: "#f59e0b" },
+                elements: { avatarBox: "w-8 h-8" },
+              }}
+            />
+          </Show>
         </div>
       </nav>
 
@@ -565,13 +575,10 @@ export default function Home() {
 
       {/* Footer */}
       <div className="border-t border-bg-border py-8">
-        <div className="max-w-5xl mx-auto px-6 flex items-center justify-between flex-wrap gap-4">
-          <span className="font-mono text-xs text-text-muted">© 2026 Mitchell Magid</span>
-          <div className="flex items-center gap-6">
-            <a href="/terms" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Terms</a>
-            <a href="/privacy" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Privacy</a>
-            <a href="mailto:mitchell.magid@gmail.com" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Contact</a>
-          </div>
+        <div className="max-w-5xl mx-auto px-6 flex items-center justify-end flex-wrap gap-6">
+          <a href="/terms" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Terms</a>
+          <a href="/privacy" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Privacy</a>
+          <a href="mailto:mitchell.magid@gmail.com" className="text-xs text-text-muted hover:text-text-secondary transition-colors">Contact</a>
         </div>
       </div>
 

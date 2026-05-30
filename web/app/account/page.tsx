@@ -65,7 +65,7 @@ export default function AccountPage() {
         <div className="max-w-2xl mx-auto px-6 h-12 flex items-center justify-between">
           <Link
             href="/"
-            className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors ml-10"
+            className="font-mono text-sm font-bold text-text-primary hover:text-accent transition-colors"
           >
             FOOTNOTE
           </Link>

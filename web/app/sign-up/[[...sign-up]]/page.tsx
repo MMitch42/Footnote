@@ -56,7 +56,7 @@ export default function Page() {
         </span>
         <p className="text-sm text-text-muted mt-1">SEC Filing Intelligence</p>
       </div>
-      <SignUp appearance={clerkAppearance} />
+      <SignUp appearance={clerkAppearance} forceRedirectUrl="/onboarding" />
     </div>
   );
 }

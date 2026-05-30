@@ -178,6 +178,25 @@ def list_diffs_raw(ticker: str, filing_type: str) -> list:
     return result.data if result.data else []
 
 
+def delete_diffs(ticker: str, filing_type: str, date_new: str, date_old: str):
+    """
+    Delete cached diff rows for a specific filing pair.
+    Used to force-recompute legacy truncated diffs (stored before cap-skipped sentinels).
+    Does NOT delete the synthesis row so it gets regenerated too.
+    """
+    client = get_client()
+    return (
+        client.table("diffs")
+        .delete()
+        .eq("ticker", ticker.upper())
+        .eq("filing_type", filing_type)
+        .eq("filing_date_new", date_new)
+        .eq("filing_date_old", date_old)
+        .neq("section", "synthesis")
+        .execute()
+    )
+
+
 def list_filings_dates(ticker: str, filing_type: str) -> list:
     """Return all cached filing dates for a ticker, newest first."""
     client = get_client()

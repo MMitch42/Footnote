@@ -1,6 +1,45 @@
 import difflib
 
 
+def deduplicate_moves(changed_passages: list[dict], similarity_threshold: float = 0.92) -> list[dict]:
+    """
+    Remove paragraph pairs that appear as both a pure deletion and a pure addition
+    where the text is nearly identical — these are paragraphs that were *moved*
+    in the document, not actually changed.
+
+    SequenceMatcher sees a moved paragraph as:
+      {"old": "wearables text", "new": ""}   ← delete at old position
+      {"old": "",  "new": "wearables text"}  ← insert at new position
+
+    We match every pure-deletion against every pure-addition. If their similarity
+    is at or above the threshold we treat both as a positional move and discard
+    them — nothing actually changed in the text.
+
+    similarity_threshold=0.92 tolerates minor punctuation/formatting drift while
+    still catching genuine moves.  Set lower to be more aggressive.
+    """
+    additions = [(i, p) for i, p in enumerate(changed_passages) if not p.get("old") and p.get("new")]
+    deletions = [(i, p) for i, p in enumerate(changed_passages) if p.get("old") and not p.get("new")]
+
+    to_remove: set[int] = set()
+
+    for del_idx, del_p in deletions:
+        if del_idx in to_remove:
+            continue
+        for add_idx, add_p in additions:
+            if add_idx in to_remove:
+                continue
+            ratio = difflib.SequenceMatcher(None, del_p["old"], add_p["new"]).ratio()
+            if ratio >= similarity_threshold:
+                to_remove.add(del_idx)
+                to_remove.add(add_idx)
+                break  # each deletion matches at most one addition
+
+    if not to_remove:
+        return changed_passages
+    return [p for i, p in enumerate(changed_passages) if i not in to_remove]
+
+
 def split_paragraphs(text: str, min_words: int = 20) -> list[str]:
     """
     Split on double newlines and drop short paragraphs.
@@ -41,11 +80,14 @@ def compute_diff(old_text: str, new_text: str) -> dict:
                 for p in old_paras[i1 + (j2 - j1):i2]:
                     removed.append({"old": p, "new": ""})
 
+    raw_changes = added + removed
+    deduped = deduplicate_moves(raw_changes)
+
     total = max(len(old_paras), 1)
-    change_ratio = (len(added) + len(removed)) / total
+    change_ratio = len(deduped) / total
 
     return {
-        "changed_passages": added + removed,
+        "changed_passages": deduped,
         "unchanged_count": len(unchanged),
         "change_ratio": round(change_ratio, 4),
     }

@@ -18,7 +18,7 @@ export default function TermsPage() {
           ← Back
         </Link>
         <h1 className="font-mono text-2xl font-bold text-text-primary mb-2">Terms of Service</h1>
-        <p className="text-sm text-text-muted mb-10">Last updated: May 26, 2026</p>
+        <p className="text-sm text-text-muted mb-10">Last updated: May 29, 2026</p>
 
         <div className="space-y-8 text-sm text-text-secondary leading-relaxed">
 
@@ -80,17 +80,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-text-primary mb-2">6. Intellectual Property</h2>
-            <p>
-              The Footnote application code and user interface are owned by Mitchell Magid.
-              SEC filings retrieved through the Service are public domain documents published by
-              the U.S. Securities and Exchange Commission. You may not copy or distribute the
-              application code or interface design without permission.
-            </p>
-          </section>
-
-          <section>
-            <h2 className="font-semibold text-text-primary mb-2">7. Disclaimers and Limitation of Liability</h2>
+            <h2 className="font-semibold text-text-primary mb-2">6. Disclaimers and Limitation of Liability</h2>
             <p className="mb-3">
               The Service is provided &ldquo;as is&rdquo; without warranties of any kind. We do not
               warrant that the Service will be uninterrupted, error-free, or that filing data will be
@@ -104,7 +94,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-text-primary mb-2">8. Changes to Terms</h2>
+            <h2 className="font-semibold text-text-primary mb-2">7. Changes to Terms</h2>
             <p>
               We may update these Terms at any time. Continued use of the Service after changes
               constitutes acceptance of the updated Terms. Material changes will be communicated
@@ -113,7 +103,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-text-primary mb-2">9. Governing Law</h2>
+            <h2 className="font-semibold text-text-primary mb-2">8. Governing Law</h2>
             <p>
               These Terms are governed by the laws of the State of Illinois, United States,
               without regard to conflict of law principles.
@@ -121,7 +111,7 @@ export default function TermsPage() {
           </section>
 
           <section>
-            <h2 className="font-semibold text-text-primary mb-2">10. Contact</h2>
+            <h2 className="font-semibold text-text-primary mb-2">9. Contact</h2>
             <p>
               Questions about these Terms:{" "}
               <a href="mailto:mitchell.magid@gmail.com" className="text-accent hover:text-accent-bright transition-colors">
