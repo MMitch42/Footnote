@@ -3,9 +3,10 @@ import os
 import uuid
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from pipeline import alert_mode, historical_mode, INITIAL_SCORE_CAP
+from pipeline import alert_mode, historical_mode, INITIAL_SCORE_CAP, SECTIONS
 from scoring import score_all
 from synthesis import synthesize
+from diff import compute_diff, filter_scorable
 import fetcher as edgar_client
 import db
 
@@ -117,6 +118,109 @@ def recompute_diff(ticker: str, date_new: str, date_old: str, form: str = "10-K"
     db.delete_diffs(ticker, form, date_new, date_old)
     result = alert_mode(ticker, form=form)
     return result
+
+
+@app.post("/verify/{ticker}")
+def verify_diff(ticker: str, form: str = "10-K"):
+    """
+    Cheap count-verification pass.  Re-fetches the two most recent filings from EDGAR
+    and re-diffs all sections — without calling Gemini at all.
+
+    - If every section already has as many (or more) passages cached as the fresh diff
+      contains: returns the existing cached data.  Zero API cost.
+
+    - If any section is missing passages: appends null stubs for the extras on top of
+      the existing scored passages (no re-scoring, no cache deletion).  The frontend's
+      score-more machinery then picks up the stubs automatically.
+
+    This is what "↺ Refresh" calls.  Only triggers Gemini when genuinely new passages
+    are discovered; otherwise it's a free EDGAR re-diff.
+    """
+    ticker = ticker.upper()
+    print(f"[verify] {ticker} {form} — checking passage count against EDGAR", flush=True)
+
+    filings = edgar_client.get_filings(ticker, form=form, n=2)
+    if len(filings) < 2:
+        return {"error": f"fewer than 2 {form} filings found for {ticker}"}
+
+    new_filing = edgar_client.extract_sections(filings[0])
+    old_filing = edgar_client.extract_sections(filings[1])
+
+    # Persist filings to DB (idempotent — no-op if already stored)
+    db.upsert_filing(ticker, form, new_filing)
+    db.upsert_filing(ticker, form, old_filing)
+
+    date_new = new_filing["filing_date"]
+    date_old = old_filing["filing_date"]
+
+    sections_updated = {}
+
+    for section in SECTIONS:
+        cached = db.get_diff(ticker, form, date_new, date_old, section)
+        cached_passages = list(cached.get("changed_passages") or []) if cached else []
+
+        fresh_diff = compute_diff(
+            old_filing.get(section, ""),
+            new_filing.get(section, ""),
+        )
+        fresh_scorable = filter_scorable(fresh_diff["changed_passages"])
+
+        extra = len(fresh_scorable) - len(cached_passages)
+        print(
+            f"  [verify] {ticker}/{section}: cached={len(cached_passages)}  fresh={len(fresh_scorable)}",
+            flush=True,
+        )
+
+        if extra <= 0:
+            # Nothing new — keep cached as-is
+            if cached:
+                sections_updated[section] = cached
+            continue
+
+        # Append null stubs for the previously-unseen passages.
+        # We keep all existing scored passages intact.
+        new_stubs = [
+            {
+                "old":         p.get("old", ""),
+                "new":         p.get("new", ""),
+                "score":       None,
+                "direction":   None,
+                "explanation": None,
+            }
+            for p in fresh_scorable[len(cached_passages):]
+        ]
+
+        updated_diff = {
+            "changed_passages": cached_passages + new_stubs,
+            "change_ratio": fresh_diff["change_ratio"],
+        }
+        db.upsert_diff(ticker, form, date_new, date_old, section, updated_diff)
+        sections_updated[section] = updated_diff
+        print(
+            f"  [verify] {ticker}/{section}: appended {len(new_stubs)} new stub(s)",
+            flush=True,
+        )
+
+    # For any sections that had no cache at all (shouldn't happen normally),
+    # fall back to alert_mode which will score them from scratch.
+    missing = [s for s in SECTIONS if s not in sections_updated]
+    if missing:
+        print(f"[verify] {ticker}: running alert_mode for uncached section(s) {missing}", flush=True)
+        return alert_mode(ticker, form=form)
+
+    # Assemble the response — same shape as /alert and /diff
+    synthesis = db.get_synthesis(ticker, form, date_new, date_old)
+    company_name = edgar_client.get_company_name(ticker)
+
+    return {
+        "ticker": ticker,
+        "company_name": company_name,
+        "filing_type": form,
+        "date_new": date_new,
+        "date_old": date_old,
+        "sections": sections_updated,
+        "synthesis": synthesis,
+    }
 
 
 @app.get("/recent")

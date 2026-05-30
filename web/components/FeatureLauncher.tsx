@@ -20,6 +20,11 @@ export function FeatureLauncher() {
   const [view, setView] = useState<PanelView>("menu");
 
   // ← NOTE: PanelView === FeatureLauncherView, both are "menu" | "feedback"
+
+  // Panel anchor — updated whenever the panel opens so it sits under whichever
+  // trigger button is currently in the DOM (nav button position varies by page/viewport).
+  const [panelAnchor, setPanelAnchor] = useState<{ top: number; left: number }>({ top: 44, left: 8 });
+
   const [plan, setPlan] = useState<Plan>(null);
   const [watchlist, setWatchlist] = useState<WatchedTicker[]>([]);
   const [query, setQuery] = useState("");
@@ -41,6 +46,18 @@ export function FeatureLauncher() {
     setOpen(open);
     setView(view as PanelView);
   }), []);
+
+  // Re-anchor the panel under the trigger button every time it opens.
+  // getBoundingClientRect gives viewport-relative coords which are correct for `fixed`.
+  useEffect(() => {
+    if (!open) return;
+    const trigger = document.querySelector("[data-launcher-trigger]") as HTMLElement | null;
+    if (trigger) {
+      const rect = trigger.getBoundingClientRect();
+      setPanelAnchor({ top: rect.bottom + 6, left: rect.left });
+    }
+  }, [open]);
+
   const { isSignedIn, isLoaded, user } = useUser();
   const pathname = usePathname();
   const router = useRouter();
@@ -174,7 +191,8 @@ export function FeatureLauncher() {
       {open && (
         <div
           ref={panelRef}
-          className="fixed top-11 left-2 sm:left-3 w-72 bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden max-h-[calc(100vh-64px)]"
+          className="fixed w-72 bg-bg-surface border border-bg-border rounded-xl shadow-2xl flex flex-col z-50 overflow-hidden max-h-[calc(100vh-64px)]"
+          style={{ top: panelAnchor.top, left: panelAnchor.left }}
         >
           {view === "feedback" ? (
             /* ── Feedback view ───────────────────────────── */

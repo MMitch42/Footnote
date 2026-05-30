@@ -848,6 +848,34 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     }
   };
 
+  // Shared handler for recompute and verify — updates state with the returned diff.
+  const _applyUpdatedDiff = (updated: DiffResult) => {
+    const cacheKey = buildCacheKey(data!.ticker, data!.filing_type, data!.date_new, data!.date_old);
+    _diffCache.set(cacheKey, updated);
+    setData(updated);
+    const allP = Object.entries(updated.sections ?? {})
+      .flatMap(([sec, diff]) =>
+        (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section: sec }))
+      )
+      .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
+    setDiffContext({
+      ticker: updated.ticker,
+      companyName: updated.company_name,
+      filingType: updated.filing_type,
+      dateNew: updated.date_new,
+      dateOld: updated.date_old,
+      synthesis: updated.synthesis ?? null,
+      topPassages: allP.slice(0, 25).map((p) => ({
+        old: p.old?.slice(0, 700) ?? "",
+        new: p.new?.slice(0, 700) ?? "",
+        score: p.score,
+        direction: p.direction,
+        explanation: p.explanation,
+        section: p.section,
+      })),
+    });
+  };
+
   // Re-run the full diff for diffs that were hard-cut at 60 by old pipeline logic.
   const recompute = async () => {
     if (!data || scoringMore) return;
@@ -864,34 +892,29 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
         }),
       });
       const updated: DiffResult = await res.json();
-      if (res.ok && !updated.error) {
-        const cacheKey = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
-        _diffCache.set(cacheKey, updated);
-        setData(updated);
-        const allP = Object.entries(updated.sections ?? {})
-          .flatMap(([sec, diff]) =>
-            (diff as SectionDiff).changed_passages.map((p) => ({ ...p, section: sec }))
-          )
-          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0));
-        setDiffContext({
-          ticker: updated.ticker,
-          companyName: updated.company_name,
-          filingType: updated.filing_type,
-          dateNew: updated.date_new,
-          dateOld: updated.date_old,
-          synthesis: updated.synthesis ?? null,
-          topPassages: allP.slice(0, 25).map((p) => ({
-            old: p.old?.slice(0, 700) ?? "",
-            new: p.new?.slice(0, 700) ?? "",
-            score: p.score,
-            direction: p.direction,
-            explanation: p.explanation,
-            section: p.section,
-          })),
-        });
-      }
+      if (res.ok && !updated.error) _applyUpdatedDiff(updated);
     } catch (e) {
       console.error("[recompute] failed:", e);
+    } finally {
+      setScoringMore(false);
+    }
+  };
+
+  // Verify the change count against EDGAR without burning Gemini credits.
+  // Re-diffs both filings and only calls the scoring API if extra passages are found.
+  const verifyCount = async () => {
+    if (!data || scoringMore) return;
+    setScoringMore(true);
+    try {
+      const res = await fetch("/api/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ticker: data.ticker, form: data.filing_type }),
+      });
+      const updated: DiffResult = await res.json();
+      if (res.ok && !updated.error) _applyUpdatedDiff(updated);
+    } catch (e) {
+      console.error("[verify] failed:", e);
     } finally {
       setScoringMore(false);
     }
@@ -1009,6 +1032,17 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                 }`}>
                 {watchLoading ? "…" : watching ? "★ Watching" : "☆ Watch"}
               </button>
+              {/* Re-run diff from EDGAR — lets users verify the change count is complete */}
+              {data && !data.error && !loading && (
+                <button
+                  onClick={verifyCount}
+                  disabled={scoringMore}
+                  title="Re-diff from EDGAR to verify the change count is complete. Free if nothing changed — only scores if new passages are found."
+                  className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150 disabled:opacity-40 hidden sm:block"
+                >
+                  {scoringMore ? "…" : "↺ Refresh"}
+                </button>
+              )}
               <Link href="/watchlist" className="hidden sm:block text-xs text-text-secondary hover:text-text-primary transition-colors duration-150">Watchlist</Link>
               {plan === "free" && (
                 <a href="/upgrade" className="text-xs font-semibold px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150 whitespace-nowrap">
@@ -1222,7 +1256,7 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
               className={`px-4 py-2.5 text-xs border-b-2 whitespace-nowrap transition-colors duration-100 ${
                 activeTab === "changes" ? "border-accent text-text-primary font-medium" : "border-transparent text-text-muted hover:text-text-secondary"
               }`}>
-              Changes · {allPassages.length}{scoringMore ? " …" : ""}
+              Changes · {allPassages.length}
             </button>
           </div>
 
@@ -1284,8 +1318,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                     );
                   })}
                 </div>
-                {/* Scoring status chip */}
-                {scoringMore ? (
+                {/* Scoring progress — only shown while work is in flight */}
+                {scoringMore && (
                   <div className="shrink-0 flex items-center px-3 border-l border-bg-border gap-1.5">
                     <div className="flex gap-0.5">
                       {[0,1,2].map((i) => (
@@ -1293,14 +1327,10 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
                       ))}
                     </div>
                     <span className="text-[10px] text-text-muted whitespace-nowrap">
-                      {unscoredCount > 0 ? `Scoring ${unscoredCount} more…` : "Updating…"}
+                      {unscoredCount > 0 ? `Scoring ${unscoredCount} more…` : "Checking…"}
                     </span>
                   </div>
-                ) : unscoredCount === 0 && allPassages.length > 0 ? (
-                  <div className="shrink-0 flex items-center px-3 border-l border-bg-border">
-                    <span className="text-[10px] text-text-muted" title="All changes have been scored">✓ {allPassages.length} total</span>
-                  </div>
-                ) : null}
+                )}
                 {/* Search input — always visible */}
                 <div className="shrink-0 flex items-center px-2 border-l border-bg-border">
                   <input
