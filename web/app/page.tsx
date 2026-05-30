@@ -111,7 +111,7 @@ export default function Home() {
   const [recentFeed, setRecentFeed] = useState<RecentEntry[]>([]);
   const [feedLoading, setFeedLoading] = useState(true);
   useEffect(() => {
-    fetch(`${API_URL}/recent?limit=6`)
+    fetch(`${API_URL}/recent?limit=8`)
       .then((r) => r.ok ? r.json() : [])
       .then((d) => { setRecentFeed(Array.isArray(d) ? d : []); setFeedLoading(false); })
       .catch(() => setFeedLoading(false));
@@ -213,6 +213,12 @@ export default function Home() {
               >
                 Watchlist
               </a>
+              <UserButton
+                appearance={{
+                  variables: { colorPrimary: "#f59e0b" },
+                  elements: { avatarBox: "w-7 h-7" },
+                }}
+              />
             </Show>
           </div>
 
@@ -243,12 +249,6 @@ export default function Home() {
                 Get Pro →
               </a>
             )}
-            <UserButton
-              appearance={{
-                variables: { colorPrimary: "#f59e0b" },
-                elements: { avatarBox: "w-8 h-8" },
-              }}
-            />
           </Show>
         </div>
       </nav>
@@ -259,17 +259,10 @@ export default function Home() {
           className="absolute inset-0 pointer-events-none"
           style={{ background: "radial-gradient(ellipse 90% 60% at 50% -5%, rgba(245,158,11,0.09) 0%, transparent 65%)" }}
         />
-        <div className={`relative z-10 max-w-5xl mx-auto px-6 pb-16 ${isSignedIn ? "pt-12" : "pt-20"}`}>
+        <div className={`relative z-10 max-w-5xl mx-auto px-6 ${isSignedIn ? "pt-6 pb-6" : "pt-20 pb-16"}`}>
 
-          {/* Dashboard header — signed-in users */}
-          {isSignedIn ? (
-            <>
-              <p className="font-mono text-[10px] text-accent uppercase tracking-widest mb-3">Dashboard</p>
-              <h1 className="font-mono text-2xl font-bold text-text-primary leading-tight mb-6">
-                What changed this week?
-              </h1>
-            </>
-          ) : (
+          {/* Marketing heading — signed-out only */}
+          {!isSignedIn && (
             <>
               <h1 className="font-mono text-4xl font-bold text-text-primary leading-tight mb-5 max-w-xl whitespace-pre-line">
                 {typed}{!typingDone && <span className="text-accent animate-pulse">_</span>}
@@ -430,6 +423,124 @@ export default function Home() {
           </div>
         )}
 
+        {/* ── Recent changes feed ─────────────────────────────── */}
+        {(feedLoading || recentFeed.length > 0 || isSignedIn) && (
+          <div className={isSignedIn ? "py-10" : "border-t border-bg-border py-14"}>
+            {/* Section header */}
+            {isSignedIn ? (
+              <div className="mb-6">
+                <h2 className="text-base font-semibold text-text-primary flex items-center gap-2.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse inline-block shrink-0" />
+                  What changed this week
+                  {recentFeed.length > 0 && !feedLoading && (
+                    <span className="font-mono text-[10px] text-text-muted bg-bg-surface border border-bg-border rounded px-1.5 py-0.5 leading-none">
+                      {recentFeed.length} filing{recentFeed.length !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                </h2>
+                <p className="text-xs text-text-muted mt-1">Sorted by materiality score — click any row to read the full diff</p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3 mb-6">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
+                  <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Recent filing changes</span>
+                </div>
+                <div className="h-px flex-1 bg-bg-border" />
+              </div>
+            )}
+
+            {feedLoading ? (
+              <div className="space-y-2">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 rounded-lg bg-bg-surface animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
+                ))}
+              </div>
+            ) : recentFeed.length === 0 ? (
+              <div className="rounded-xl border border-bg-border px-6 py-10 text-center">
+                <p className="text-sm text-text-muted">No new filing changes this week.</p>
+                <p className="text-xs text-text-muted mt-1 opacity-60">Check back soon — we process new filings daily.</p>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
+                {recentFeed.map((entry, i) => {
+                  const borderColor =
+                    entry.max_score >= 9 ? "border-l-[#f87171]" :
+                    entry.max_score >= 7 ? "border-l-accent" :
+                    entry.max_score >= 4 ? "border-l-[#d97706]" : "border-l-transparent";
+                  const scoreColor =
+                    entry.max_score >= 9 ? "text-[#f87171]" :
+                    entry.max_score >= 7 ? "text-accent" :
+                    entry.max_score >= 4 ? "text-[#d97706]" : "text-text-muted";
+                  const scoreBg =
+                    entry.max_score >= 9 ? "bg-[#f87171]/10" :
+                    entry.max_score >= 7 ? "bg-accent/10" :
+                    entry.max_score >= 4 ? "bg-[#d97706]/10" : "bg-bg-surface";
+                  const scoreLabel =
+                    entry.max_score >= 9 ? "Critical" :
+                    entry.max_score >= 7 ? "High" :
+                    entry.max_score >= 4 ? "Notable" : "Low";
+                  const dirLabel =
+                    entry.direction === "escalating" ? "↑ Escalating" :
+                    entry.direction === "reassuring"  ? "↓ Reassuring" : null;
+                  const dirColor =
+                    entry.direction === "escalating" ? "text-[#f87171]" :
+                    entry.direction === "reassuring"  ? "text-diff-add-text" : "";
+
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => router.push(`/diff/${entry.ticker}${entry.filing_type === "10-Q" ? "?type=10-Q" : ""}`)}
+                      className={`w-full text-left pl-4 pr-5 py-3.5 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group border-l-2 ${borderColor}`}
+                    >
+                      {/* Company name + ticker + type */}
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        {entry.company_name ? (
+                          <>
+                            <span className="text-sm font-semibold text-text-primary truncate max-w-[140px] sm:max-w-[220px]">{entry.company_name}</span>
+                            <span className="font-mono text-xs text-text-muted shrink-0">({entry.ticker})</span>
+                          </>
+                        ) : (
+                          <span className="font-mono text-sm font-bold text-text-primary shrink-0">{entry.ticker}</span>
+                        )}
+                        <span className="font-mono text-[10px] px-1.5 py-0.5 rounded border border-bg-border text-text-muted uppercase shrink-0">{entry.filing_type}</span>
+                      </div>
+
+                      {/* Score pill */}
+                      <div className={`flex items-center gap-1 shrink-0 px-2 py-0.5 rounded-full ${scoreBg}`}>
+                        <span className={`font-mono text-xs font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
+                        <span className={`text-xs hidden sm:inline ${scoreColor} ml-0.5`}>{scoreLabel}</span>
+                      </div>
+
+                      {/* Direction */}
+                      <span className={`text-xs shrink-0 ${dirColor || "text-text-muted"}`}>
+                        <span className="sm:hidden">
+                          {entry.direction === "escalating" ? "↑" : entry.direction === "reassuring" ? "↓" : "—"}
+                        </span>
+                        <span className="hidden sm:inline">
+                          {dirLabel ?? "Neutral"}
+                        </span>
+                      </span>
+
+                      {/* Date range */}
+                      <span className="font-mono text-xs text-text-muted hidden sm:block shrink-0">
+                        {entry.date_old} <span className="text-accent">→</span> {entry.date_new}
+                      </span>
+
+                      {/* Changes count */}
+                      <span className="text-xs text-text-muted hidden md:block w-20 text-right shrink-0">
+                        {entry.n_changes} change{entry.n_changes !== 1 ? "s" : ""}
+                      </span>
+
+                      <span className="text-text-muted group-hover:text-accent transition-colors text-sm shrink-0">→</span>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* ── Signal / Alpha stats — hidden for Pro/Research ───── */}
         {(plan !== "pro" && plan !== "research") && (
           <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10">
@@ -451,16 +562,39 @@ export default function Home() {
                 /* Signed-in free: feature list + upgrade */
                 <>
                   <p className="text-xs text-text-muted uppercase tracking-wide font-medium mb-4">Unlock with Pro</p>
-                  <div className="space-y-2.5 mb-5">
-                    {[
-                      "Instant email alerts when companies file",
-                      "Unlimited watchlist (free: 2 companies)",
-                      "Footnote AI — ask questions about any diff",
-                      "Full synthesis reports on every filing",
-                    ].map((f) => (
-                      <div key={f} className="flex items-start gap-2.5">
+                  <div className="space-y-3.5 mb-5">
+                    {([
+                      {
+                        title: "Footnote AI",
+                        body: "Ask anything about the diff in plain English. Find topic-specific changes, explain language shifts, search across all passages at once.",
+                      },
+                      {
+                        title: "Full intelligence report",
+                        body: "Concerns, reassurances, management sentiment, and business outlook synthesized from every change in the filing.",
+                      },
+                      {
+                        title: "10-Q quarterly diffs + word-level view",
+                        body: "Track quarterly filings, not just annual 10-Ks. Inline word diff shows what changed within a passage.",
+                      },
+                      {
+                        title: "Unlimited watchlist",
+                        body: null,
+                      },
+                      {
+                        title: "Email alerts when filings change",
+                        body: "Adjustable threshold per ticker.",
+                      },
+                      {
+                        title: "Personalized weekly digest",
+                        body: "Your watched companies only, with full synthesis. You currently get the free editorial top-3 across all public companies.",
+                      },
+                    ] as { title: string; body: string | null }[]).map(({ title, body }) => (
+                      <div key={title} className="flex items-start gap-2.5">
                         <span className="text-accent text-xs shrink-0 mt-0.5">✓</span>
-                        <span className="text-sm text-text-secondary">{f}</span>
+                        <div>
+                          <p className="text-sm font-medium text-text-primary leading-snug">{title}</p>
+                          {body && <p className="text-xs text-text-muted mt-0.5 leading-relaxed">{body}</p>}
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -523,107 +657,6 @@ export default function Home() {
             ))}
           </div>
         </div>}
-
-        {/* Recent filing changes feed */}
-        {(feedLoading || recentFeed.length > 0 || isSignedIn) && (
-          <div className="border-t border-bg-border py-14">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="flex items-center gap-1.5">
-                <div className="w-1.5 h-1.5 rounded-full bg-accent animate-pulse" />
-                <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Recent filing changes</span>
-              </div>
-              <div className="h-px flex-1 bg-bg-border" />
-            </div>
-
-            {feedLoading ? (
-              <div className="space-y-2">
-                {[0, 1, 2, 3].map((i) => (
-                  <div key={i} className="h-11 rounded-lg bg-bg-surface animate-pulse" style={{ opacity: 1 - i * 0.2 }} />
-                ))}
-              </div>
-            ) : recentFeed.length === 0 ? (
-              <div className="rounded-xl border border-bg-border px-6 py-10 text-center">
-                <p className="text-sm text-text-muted">No new filing changes this week.</p>
-                <p className="text-xs text-text-muted mt-1 opacity-60">Check back soon — we process new filings daily.</p>
-              </div>
-            ) : (
-              <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
-                {recentFeed.map((entry, i) => {
-                  const scoreColor =
-                    entry.max_score >= 9 ? "text-[#f87171]" :
-                    entry.max_score >= 7 ? "text-accent" :
-                    entry.max_score >= 4 ? "text-[#d97706]" : "text-text-muted";
-                  const dotColor =
-                    entry.max_score >= 9 ? "bg-[#f87171]" :
-                    entry.max_score >= 7 ? "bg-accent" :
-                    entry.max_score >= 4 ? "bg-[#d97706]" : "bg-text-muted";
-                  const scoreLabel =
-                    entry.max_score >= 9 ? "Critical" :
-                    entry.max_score >= 7 ? "High" :
-                    entry.max_score >= 4 ? "Notable" : "Low";
-                  const dirLabel =
-                    entry.direction === "escalating" ? "↑ Escalating" :
-                    entry.direction === "reassuring"  ? "↓ Reassuring" : null;
-                  const dirColor =
-                    entry.direction === "escalating" ? "text-[#f87171]" :
-                    entry.direction === "reassuring"  ? "text-diff-add-text" : "";
-
-                  return (
-                    <button
-                      key={i}
-                      onClick={() => router.push(`/diff/${entry.ticker}${entry.filing_type === "10-Q" ? "?type=10-Q" : ""}`)}
-                      className="w-full text-left px-4 py-3 flex items-center gap-3 hover:bg-bg-raised transition-colors duration-100 group"
-                    >
-                      {/* Score dot */}
-                      <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotColor}`} />
-
-                      {/* Company name + ticker + type */}
-                      <div className="flex items-center gap-2 min-w-0">
-                        {entry.company_name ? (
-                          <>
-                            <span className="text-sm font-semibold text-text-primary truncate max-w-[140px] sm:max-w-[200px]">{entry.company_name}</span>
-                            <span className="font-mono text-xs text-text-muted shrink-0">({entry.ticker})</span>
-                          </>
-                        ) : (
-                          <span className="font-mono text-sm font-bold text-text-primary shrink-0">{entry.ticker}</span>
-                        )}
-                        <span className="font-mono text-[10px] px-1 py-0.5 rounded border border-bg-border text-text-muted uppercase shrink-0">{entry.filing_type}</span>
-                      </div>
-
-                      {/* Score — label hidden on small screens */}
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <span className={`font-mono text-sm font-bold tabular-nums ${scoreColor}`}>{entry.max_score}/10</span>
-                        <span className={`text-xs hidden sm:inline ${scoreColor}`}>{scoreLabel}</span>
-                      </div>
-
-                      {/* Direction — abbreviated on mobile */}
-                      <span className={`text-xs shrink-0 ${dirColor || "text-text-muted"}`}>
-                        <span className="sm:hidden">
-                          {entry.direction === "escalating" ? "↑" : entry.direction === "reassuring" ? "↓" : "—"}
-                        </span>
-                        <span className="hidden sm:inline">
-                          {dirLabel ?? "Neutral"}
-                        </span>
-                      </span>
-
-                      {/* Date range */}
-                      <span className="font-mono text-xs text-text-muted hidden sm:block flex-1">
-                        {entry.date_old} <span className="text-accent">→</span> {entry.date_new}
-                      </span>
-
-                      {/* Changes count */}
-                      <span className="text-xs text-text-muted hidden md:block w-20 text-right shrink-0">
-                        {entry.n_changes} change{entry.n_changes !== 1 ? "s" : ""}
-                      </span>
-
-                      <span className="text-text-muted group-hover:text-accent transition-colors text-sm shrink-0">→</span>
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        )}
 
         {/* Real example — marketing only */}
         {!isSignedIn && <div ref={demoRef} className={`border-t border-bg-border py-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>

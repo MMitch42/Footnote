@@ -9,10 +9,11 @@ type Feature = { label: string; detail?: string };
 
 const FREE_FEATURES: Feature[] = [
   { label: "Latest 10-K diff for any public company" },
-  { label: "Novelty scores on every changed passage (1–10)" },
+  { label: "Novelty scores on every changed passage (1-10)" },
   { label: "Risk Factors, MD&A, and Legal Proceedings" },
   { label: "Overview summary" },
   { label: "Watchlist: up to 2 tickers" },
+  { label: "Weekly digest: top 3 editorial picks across all public companies" },
 ];
 
 const PRO_FEATURES: Feature[] = [
@@ -31,7 +32,10 @@ const PRO_FEATURES: Feature[] = [
   },
   { label: "Unlimited watchlist" },
   { label: "Email alerts when filings change (adjustable threshold)" },
-  { label: "Weekly digest across your watchlist" },
+  {
+    label: "Personalized weekly digest",
+    detail: "Your watched companies only, with full synthesis. Not the editorial top-3.",
+  },
 ];
 
 type Plan = "free" | "pro" | "research" | null;

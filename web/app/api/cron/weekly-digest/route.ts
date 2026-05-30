@@ -179,7 +179,9 @@ export async function GET(req: Request) {
         .filter((s) => tickers.includes(s.ticker))
         .sort((a, b) => b.maxScore - a.maxScore);
 
+      // Skip if nothing notable — all changes are noise level (score < 4)
       if (!userSummaries.length) continue;
+      if (userSummaries[0].maxScore < 4) continue;
 
       const user = await clerk.users.getUser(userId);
       const email = user.emailAddresses[0]?.emailAddress;
