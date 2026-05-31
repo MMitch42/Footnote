@@ -589,6 +589,12 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const { ticker } = use(params);
   const router = useRouter();
   const searchParams = useSearchParams();
+  const pathname = `/diff/${ticker}`;
+  const currentUrl = searchParams.toString()
+    ? `${pathname}?${searchParams.toString()}`
+    : pathname;
+  const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(currentUrl)}`;
+  const signUpUrl = `/sign-up?redirect_url=${encodeURIComponent(currentUrl)}`;
   const dateNew = searchParams.get("date_new");
   const dateOld = searchParams.get("date_old");
   const isHistorical = !!(dateNew && dateOld);
@@ -1073,8 +1079,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
           </Show>
           <Show when="signed-out">
             <div className="flex items-center gap-3">
-              <a href="/sign-in" className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150">Sign in</a>
-              <a href="/sign-up" className="text-xs font-medium px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150">Get alerts</a>
+              <a href={signInUrl} className="text-xs text-text-muted hover:text-text-secondary transition-colors duration-150">Sign in</a>
+              <a href={signUpUrl} className="text-xs font-medium px-3 h-7 flex items-center bg-accent text-bg-base rounded hover:bg-accent-bright transition-colors duration-150">Get alerts</a>
             </div>
           </Show>
         </div>

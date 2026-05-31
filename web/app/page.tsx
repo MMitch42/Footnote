@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { Show, UserButton, useUser } from "@clerk/nextjs";
 import { toggleFeatureLauncher, openFeatureLauncherFeedback } from "@/lib/featureLauncherStore";
 
@@ -59,7 +59,15 @@ export default function Home() {
   const [watchlistItems, setWatchlistItems] = useState<{ ticker: string }[]>([]);
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const { isSignedIn, isLoaded: clerkLoaded } = useUser();
+
+  const currentUrl = searchParams.toString()
+    ? `${pathname}?${searchParams.toString()}`
+    : pathname;
+  const signInUrl  = `/sign-in?redirect_url=${encodeURIComponent(currentUrl)}`;
+  const signUpUrl  = `/sign-up?redirect_url=${encodeURIComponent(currentUrl)}`;
 
   // True once we know both (a) who the user is and (b) what plan they're on.
   // Until then we show skeletons instead of the wrong content.
@@ -303,13 +311,13 @@ export default function Home() {
           {/* Right actions */}
           <Show when="signed-out">
             <a
-              href="/sign-in"
+              href={signInUrl}
               className="text-sm text-text-secondary hover:text-text-primary transition-colors duration-150"
             >
               Sign in
             </a>
             <a
-              href="/sign-up"
+              href={signUpUrl}
               className="text-sm font-medium px-4 h-8 flex items-center bg-text-primary text-bg-base rounded hover:bg-text-primary/90 transition-colors duration-150"
             >
               Sign up
