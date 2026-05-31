@@ -59,28 +59,32 @@ export default function Home() {
   const [watchlistItems, setWatchlistItems] = useState<{ ticker: string }[]>([]);
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, isLoaded: clerkLoaded } = useUser();
 
   useEffect(() => {
+    if (!clerkLoaded) return;
+    if (!isSignedIn) { setPlan("free"); return; }
     fetch("/api/subscription")
       .then((r) => r.ok ? r.json() : { plan: "free" })
       .then((d) => setPlan(d.plan ?? "free"))
       .catch(() => setPlan("free"));
-  }, []);
+  }, [clerkLoaded, isSignedIn]);
 
   // Watchlist for signed-in dashboard
   useEffect(() => {
+    if (!clerkLoaded) return;
     if (!isSignedIn) { setWatchlistLoading(false); return; }
     fetch("/api/watchlist")
       .then((r) => r.ok ? r.json() : [])
       .then((d) => { setWatchlistItems(Array.isArray(d) ? d.slice(0, 8) : []); setWatchlistLoading(false); })
       .catch(() => setWatchlistLoading(false));
-  }, [isSignedIn]);
+  }, [clerkLoaded, isSignedIn]);
 
   // Typewriter — only for marketing (non-signed-in) view
   const [typed, setTyped] = useState("");
   const [typingDone, setTypingDone] = useState(false);
   useEffect(() => {
+    if (!clerkLoaded) return; // wait for auth state before deciding which view to show
     if (isSignedIn) { setTyped(HEADLINE); setTypingDone(true); return; }
     let i = 0;
     const id = setInterval(() => {

@@ -1,7 +1,7 @@
 import difflib
 
 
-def deduplicate_moves(changed_passages: list[dict], similarity_threshold: float = 0.92) -> list[dict]:
+def deduplicate_moves(changed_passages: list[dict], similarity_threshold: float = 0.80) -> list[dict]:
     """
     Remove paragraph pairs that appear as both a pure deletion and a pure addition
     where the text is nearly identical — these are paragraphs that were *moved*
@@ -15,8 +15,9 @@ def deduplicate_moves(changed_passages: list[dict], similarity_threshold: float 
     is at or above the threshold we treat both as a positional move and discard
     them — nothing actually changed in the text.
 
-    similarity_threshold=0.92 tolerates minor punctuation/formatting drift while
-    still catching genuine moves.  Set lower to be more aggressive.
+    similarity_threshold=0.80 tolerates light edits (date updates, punctuation,
+    minor rewording) while still catching genuine moves.  Lowering further risks
+    discarding real content changes that happen to share significant overlap.
     """
     additions = [(i, p) for i, p in enumerate(changed_passages) if not p.get("old") and p.get("new")]
     deletions = [(i, p) for i, p in enumerate(changed_passages) if p.get("old") and not p.get("new")]

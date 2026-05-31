@@ -1,5 +1,7 @@
 import gc
+import logging
 import os
+import threading
 import uuid
 from fastapi import FastAPI, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,7 +12,16 @@ from diff import compute_diff, filter_scorable
 import fetcher as edgar_client
 import db
 
+# Suppress edgartools deprecation warnings — "TenK falling back to legacy parser"
+# fires for every filing that uses the old section layout; it's noise in production.
+logging.getLogger("edgartools").setLevel(logging.ERROR)
+logging.getLogger("edgar").setLevel(logging.ERROR)
+
 app = FastAPI(title="Footnote API")
+
+# Track whether a prefetch run is already in progress so concurrent cron
+# invocations don't stack up and double the memory usage.
+_prefetch_running = threading.Event()
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,30 +50,46 @@ def health():
 def prefetch(secret: str = None):
     """
     Pre-warm the diff cache for the top 30 tickers.
-    Called by the Vercel cron — processes tickers one at a time so Railway
-    never holds more than one pipeline run in memory simultaneously.
-    Explicit gc.collect() between tickers keeps RSS stable across the full run.
+
+    Returns 202 immediately so Vercel's cron doesn't time out and Railway's
+    health-check endpoint stays responsive during the (potentially 5-min) run.
+    The actual work happens in a daemon thread — Railway logs show progress.
+
+    A guard flag prevents concurrent runs from stacking up if the cron fires
+    while a previous run is still in progress.
     """
+    from fastapi.responses import JSONResponse
+
     cron_secret = os.getenv("CRON_SECRET")
     if cron_secret and secret != cron_secret:
-        from fastapi.responses import JSONResponse
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
 
-    results: dict[str, str] = {}
-    for ticker in TOP_TICKERS:
-        try:
-            alert_mode(ticker, form="10-K")
-            results[ticker] = "ok"
-            print(f"  [prefetch] {ticker} warmed", flush=True)
-        except Exception as e:
-            results[ticker] = str(e)
-            print(f"  [prefetch] {ticker} error: {e}", flush=True)
-        finally:
-            gc.collect()  # free filing text + diff arrays before next ticker
+    if _prefetch_running.is_set():
+        print("[prefetch] already running — skipping duplicate invocation", flush=True)
+        return JSONResponse({"status": "already_running"}, status_code=202)
 
-    ok = sum(1 for v in results.values() if v == "ok")
-    print(f"[prefetch] done — {ok}/{len(TOP_TICKERS)} ok", flush=True)
-    return {"ok": ok, "total": len(TOP_TICKERS), "results": results}
+    def _run():
+        _prefetch_running.set()
+        results: dict[str, str] = {}
+        try:
+            for ticker in TOP_TICKERS:
+                try:
+                    alert_mode(ticker, form="10-K")
+                    results[ticker] = "ok"
+                    print(f"  [prefetch] {ticker} warmed", flush=True)
+                except Exception as e:
+                    results[ticker] = str(e)
+                    print(f"  [prefetch] {ticker} error: {e}", flush=True)
+                finally:
+                    gc.collect()  # free filing text + diff arrays before next ticker
+        finally:
+            ok = sum(1 for v in results.values() if v == "ok")
+            print(f"[prefetch] done — {ok}/{len(TOP_TICKERS)} ok", flush=True)
+            _prefetch_running.clear()
+
+    t = threading.Thread(target=_run, daemon=True)
+    t.start()
+    return JSONResponse({"status": "started", "total": len(TOP_TICKERS)}, status_code=202)
 
 
 @app.get("/alert/{ticker}")
@@ -123,18 +150,16 @@ def recompute_diff(ticker: str, date_new: str, date_old: str, form: str = "10-K"
 @app.post("/verify/{ticker}")
 def verify_diff(ticker: str, form: str = "10-K"):
     """
-    Cheap count-verification pass.  Re-fetches the two most recent filings from EDGAR
-    and re-diffs all sections — without calling Gemini at all.
+    Count-verification pass.  Re-fetches the two most recent filings from EDGAR
+    and re-diffs all sections — Gemini is only called when truly necessary.
 
-    - If every section already has as many (or more) passages cached as the fresh diff
-      contains: returns the existing cached data.  Zero API cost.
+    Three outcomes per section:
+    - counts match  → keep cached as-is (zero cost)
+    - fresh > cached → append null stubs; score-more picks them up automatically
+    - fresh < cached → stale cache (e.g. moved-paragraph dedup now removes them);
+                        replace that section entirely and re-score the fresh passages
 
-    - If any section is missing passages: appends null stubs for the extras on top of
-      the existing scored passages (no re-scoring, no cache deletion).  The frontend's
-      score-more machinery then picks up the stubs automatically.
-
-    This is what "↺ Refresh" calls.  Only triggers Gemini when genuinely new passages
-    are discovered; otherwise it's a free EDGAR re-diff.
+    This is what "↺ Refresh" calls.
     """
     ticker = ticker.upper()
     print(f"[verify] {ticker} {form} — checking passage count against EDGAR", flush=True)
@@ -165,41 +190,58 @@ def verify_diff(ticker: str, form: str = "10-K"):
         )
         fresh_scorable = filter_scorable(fresh_diff["changed_passages"])
 
-        extra = len(fresh_scorable) - len(cached_passages)
+        delta = len(fresh_scorable) - len(cached_passages)
         print(
-            f"  [verify] {ticker}/{section}: cached={len(cached_passages)}  fresh={len(fresh_scorable)}",
+            f"  [verify] {ticker}/{section}: cached={len(cached_passages)}  fresh={len(fresh_scorable)}  delta={delta:+d}",
             flush=True,
         )
 
-        if extra <= 0:
-            # Nothing new — keep cached as-is
+        if delta == 0:
+            # Counts match — nothing to do
             if cached:
                 sections_updated[section] = cached
             continue
 
-        # Append null stubs for the previously-unseen passages.
-        # We keep all existing scored passages intact.
-        new_stubs = [
-            {
-                "old":         p.get("old", ""),
-                "new":         p.get("new", ""),
-                "score":       None,
-                "direction":   None,
-                "explanation": None,
+        if delta > 0:
+            # Cache is missing passages — append null stubs; score-more handles scoring
+            new_stubs = [
+                {
+                    "old":         p.get("old", ""),
+                    "new":         p.get("new", ""),
+                    "score":       None,
+                    "direction":   None,
+                    "explanation": None,
+                }
+                for p in fresh_scorable[len(cached_passages):]
+            ]
+            updated_diff = {
+                "changed_passages": cached_passages + new_stubs,
+                "change_ratio": fresh_diff["change_ratio"],
             }
-            for p in fresh_scorable[len(cached_passages):]
-        ]
+            db.upsert_diff(ticker, form, date_new, date_old, section, updated_diff)
+            sections_updated[section] = updated_diff
+            print(
+                f"  [verify] {ticker}/{section}: appended {len(new_stubs)} new stub(s)",
+                flush=True,
+            )
 
-        updated_diff = {
-            "changed_passages": cached_passages + new_stubs,
-            "change_ratio": fresh_diff["change_ratio"],
-        }
-        db.upsert_diff(ticker, form, date_new, date_old, section, updated_diff)
-        sections_updated[section] = updated_diff
-        print(
-            f"  [verify] {ticker}/{section}: appended {len(new_stubs)} new stub(s)",
-            flush=True,
-        )
+        else:
+            # Cache has MORE passages than the fresh diff — stale data.
+            # Common cause: the moved-paragraph dedup threshold was tightened and now
+            # correctly removes pairs that were previously double-counted.
+            # Replace this section with a fresh diff + full scoring.
+            print(
+                f"  [verify] {ticker}/{section}: cache has {abs(delta)} stale passage(s) — re-scoring fresh diff",
+                flush=True,
+            )
+            scored = score_all(fresh_scorable)
+            updated_diff = {
+                "changed_passages": scored,
+                "change_ratio":     fresh_diff["change_ratio"],
+                "unchanged_count":  fresh_diff.get("unchanged_count", 0),
+            }
+            db.upsert_diff(ticker, form, date_new, date_old, section, updated_diff)
+            sections_updated[section] = updated_diff
 
     # For any sections that had no cache at all (shouldn't happen normally),
     # fall back to alert_mode which will score them from scratch.
