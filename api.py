@@ -203,7 +203,12 @@ def verify_diff(ticker: str, form: str = "10-K"):
             continue
 
         if delta > 0:
-            # Cache is missing passages — append null stubs; score-more handles scoring
+            # Cache is missing passages — find the ones not already cached by fingerprint,
+            # append null stubs for them; score-more handles scoring
+            cached_fingerprints = {
+                (p.get("old", ""), p.get("new", ""))
+                for p in cached_passages
+            }
             new_stubs = [
                 {
                     "old":         p.get("old", ""),
@@ -212,7 +217,8 @@ def verify_diff(ticker: str, form: str = "10-K"):
                     "direction":   None,
                     "explanation": None,
                 }
-                for p in fresh_scorable[len(cached_passages):]
+                for p in fresh_scorable
+                if (p.get("old", ""), p.get("new", "")) not in cached_fingerprints
             ]
             updated_diff = {
                 "changed_passages": cached_passages + new_stubs,
@@ -227,19 +233,44 @@ def verify_diff(ticker: str, form: str = "10-K"):
 
         else:
             # Cache has MORE passages than the fresh diff — stale data.
-            # Common cause: the moved-paragraph dedup threshold was tightened and now
-            # correctly removes pairs that were previously double-counted.
-            # Replace this section with a fresh diff + full scoring.
-            print(
-                f"  [verify] {ticker}/{section}: cache has {abs(delta)} stale passage(s) — re-scoring fresh diff",
-                flush=True,
-            )
-            scored = score_all(fresh_scorable)
-            updated_diff = {
-                "changed_passages": scored,
-                "change_ratio":     fresh_diff["change_ratio"],
-                "unchanged_count":  fresh_diff.get("unchanged_count", 0),
+            # Common cause: moved paragraphs that were double-counted as both a
+            # deletion and an insertion but the dedup threshold now correctly removes them.
+            #
+            # Strategy: match by (old, new) content fingerprint to keep only the
+            # cached passages that still exist in the fresh diff (already scored),
+            # and discard the stale ones.  Fall back to full re-score only when
+            # fingerprint matching can't reconcile the counts exactly.
+            fresh_fingerprints = {
+                (p.get("old", ""), p.get("new", ""))
+                for p in fresh_scorable
             }
+            kept = [
+                p for p in cached_passages
+                if (p.get("old", ""), p.get("new", "")) in fresh_fingerprints
+            ]
+            if len(kept) == len(fresh_scorable):
+                # Perfect reconciliation — no Gemini calls needed
+                print(
+                    f"  [verify] {ticker}/{section}: removed {abs(delta)} stale passage(s) by fingerprint match",
+                    flush=True,
+                )
+                updated_diff = {
+                    "changed_passages": kept,
+                    "change_ratio":     fresh_diff["change_ratio"],
+                    "unchanged_count":  fresh_diff.get("unchanged_count", 0),
+                }
+            else:
+                # Fingerprints didn't reconcile cleanly — fall back to full re-score
+                print(
+                    f"  [verify] {ticker}/{section}: fingerprint match inconclusive ({len(kept)} kept vs {len(fresh_scorable)} fresh) — re-scoring",
+                    flush=True,
+                )
+                scored = score_all(fresh_scorable)
+                updated_diff = {
+                    "changed_passages": scored,
+                    "change_ratio":     fresh_diff["change_ratio"],
+                    "unchanged_count":  fresh_diff.get("unchanged_count", 0),
+                }
             db.upsert_diff(ticker, form, date_new, date_old, section, updated_diff)
             sections_updated[section] = updated_diff
 

@@ -617,9 +617,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   const [plan, setPlan] = useState<"free" | "pro" | "research">("free");
   const [scoringMore, setScoringMore] = useState(false);
   const [refreshStatus, setRefreshStatus] = useState<"idle" | "done" | "error">("idle");
-  // Track which diffs we've already auto-scored / recomputed so we don't loop
+  // Track which diffs we've already auto-scored so we don't loop
   const autoScoredRef = useRef<Set<string>>(new Set());
-  const recomputedRef = useRef<Set<string>>(new Set());
 
   // Draggable split between Analysis and Changes panels (desktop only)
   const [splitPct, setSplitPct] = useState(33);
@@ -731,17 +730,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
     }).catch(() => {});
   }, [ticker]);
 
-  // Detect diffs cached before the cap-skipped sentinel pattern was introduced.
-  // Old pipeline hard-cut at 60 passages per section with all fully scored.
-  // With current pipeline, >=60 scorable passages always produces null-score sentinels —
-  // so no sentinels + count >=60 in any section reliably means legacy truncation.
-  const isLegacyTruncated = !loading && !!data && !data.error &&
-    Object.values(data.sections ?? {}).some((diff) => {
-      const passages = (diff as SectionDiff).changed_passages;
-      return passages.length >= 60 &&
-             !passages.some((p) => p.score === null && p.explanation === null);
-    });
-
   // Auto-score remaining passages in the background once initial load finishes.
   // Railway completes the job regardless of frontend timeout — results are in Supabase on next fresh load.
   useEffect(() => {
@@ -754,17 +742,6 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data, loading]);
 
-  // Auto-recompute diffs cached by old pipeline that hard-cut at 60 passages
-  // with no cap-skipped sentinels. Fires silently in the background like score-more.
-  useEffect(() => {
-    if (!isLegacyTruncated || !data || scoringMore) return;
-    const key = buildCacheKey(data.ticker, data.filing_type, data.date_new, data.date_old);
-    if (recomputedRef.current.has(key)) return;
-    recomputedRef.current.add(key);
-    const timer = setTimeout(() => recompute(), 800);
-    return () => clearTimeout(timer);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLegacyTruncated, data]);
 
   const switchFilingType = (type: "10-K" | "10-Q") => {
     if (type === filingType) return;
