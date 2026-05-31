@@ -74,64 +74,136 @@ export async function POST(req: Request) {
 }
 
 function buildWelcomeEmail(firstName: string | null): string {
-  const greeting = firstName ? `Hi ${firstName},` : "Hi,";
-  return `
-<!DOCTYPE html>
-<html>
+  const name = firstName ?? "there";
+  return `<!DOCTYPE html>
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <style>
-    body  { background: #0d0d0d; color: #e5e5e5; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 0; padding: 0; }
-    .wrap { max-width: 520px; margin: 0 auto; padding: 48px 24px; }
-    .logo { font-family: 'Courier New', monospace; font-size: 14px; font-weight: 700; letter-spacing: 0.05em; color: #f59e0b; margin-bottom: 32px; }
-    h1    { font-size: 22px; font-weight: 600; color: #f5f5f5; margin: 0 0 16px; }
-    p     { font-size: 15px; line-height: 1.65; color: #a3a3a3; margin: 0 0 16px; }
-    .cta  { display: inline-block; margin-top: 8px; padding: 11px 22px; background: #f59e0b; color: #0d0d0d; font-weight: 700; font-size: 14px; border-radius: 8px; text-decoration: none; }
-    .divider { border: none; border-top: 1px solid #262626; margin: 32px 0; }
-    .small { font-size: 13px; color: #525252; line-height: 1.6; }
-    .mono  { font-family: 'Courier New', monospace; font-size: 13px; background: #1a1a1a; border: 1px solid #262626; border-radius: 4px; padding: 12px 16px; color: #a3a3a3; line-height: 1.7; }
-    .label { font-size: 10px; font-family: 'Courier New', monospace; text-transform: uppercase; letter-spacing: 0.08em; color: #737373; margin-bottom: 6px; }
-  </style>
+  <title>Welcome to Footnote</title>
 </head>
-<body>
-  <div class="wrap">
-    <div class="logo">FOOTNOTE</div>
+<body style="margin:0;padding:0;background:#f4f4f1;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#f4f4f1;">
+    <tr>
+      <td align="center" style="padding:48px 16px;">
+        <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:540px;">
 
-    <h1>You're in.</h1>
+          <!-- Logo bar -->
+          <tr>
+            <td style="padding-bottom:24px;">
+              <span style="font-family:'Courier New',Courier,monospace;font-size:12px;font-weight:700;letter-spacing:0.12em;color:#f59e0b;text-transform:uppercase;">Footnote</span>
+            </td>
+          </tr>
 
-    <p>${greeting}</p>
+          <!-- Main card -->
+          <tr>
+            <td style="background:#ffffff;border-radius:16px;border:1px solid #e8e8e4;overflow:hidden;">
 
-    <p>
-      Thanks for signing up. Footnote tracks SEC filings and alerts you when companies
-      quietly rewrite their risk factors, MD&amp;A, or legal disclosures — the language
-      shifts that tend to matter before most investors notice.
-    </p>
+              <!-- Amber accent bar -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="background:#f59e0b;height:4px;font-size:0;line-height:0;">&nbsp;</td>
+                </tr>
+              </table>
 
-    <div class="label">Quick start</div>
-    <div class="mono">
-      1. Enter any ticker on the homepage.<br />
-      2. See every changed passage from the latest filing, scored for significance.<br />
-      3. Add tickers to your watchlist — get emailed the moment they file.
-    </div>
+              <!-- Card body -->
+              <table width="100%" cellpadding="0" cellspacing="0" role="presentation">
+                <tr>
+                  <td style="padding:40px 44px 36px;">
 
-    <br />
+                    <h1 style="margin:0 0 8px;font-size:26px;font-weight:700;color:#111111;letter-spacing:-0.02em;line-height:1.25;">
+                      Welcome, ${name}.
+                    </h1>
+                    <p style="margin:0 0 28px;font-size:15px;line-height:1.7;color:#555555;">
+                      Your account is set up. Here is what Footnote does and how to get the most out of it.
+                    </p>
 
-    <a href="https://getfootnote.app" class="cta">Search your first ticker →</a>
+                    <!-- Divider -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:28px;">
+                      <tr><td style="border-top:1px solid #f0f0ec;font-size:0;line-height:0;">&nbsp;</td></tr>
+                    </table>
 
-    <hr class="divider" />
+                    <!-- What it does -->
+                    <p style="margin:0 0 6px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#aaaaaa;">What Footnote does</p>
+                    <p style="margin:0 0 28px;font-size:15px;line-height:1.75;color:#333333;">
+                      Every time a public company files a new 10-K or 10-Q, Footnote compares it word-for-word against the previous one. Changed passages are scored 1-10 for how much they actually matter. You find out when language shifts in ways that tend to precede bad news.
+                    </p>
 
-    <p class="small">
-      You're on the <strong style="color:#e5e5e5">free plan</strong>.
-      Upgrade to Pro for email alerts, full AI intelligence reports, 10-Q diffs, and unlimited watchlist.
-    </p>
+                    <!-- Three steps -->
+                    <p style="margin:0 0 16px;font-family:'Courier New',Courier,monospace;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:#aaaaaa;">Get started in 3 steps</p>
 
-    <p class="small">
-      Questions? Just reply to this email.<br />
-      — Mitchell
-    </p>
-  </div>
+                    <!-- Step 1 -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:12px;">
+                      <tr>
+                        <td width="32" valign="top" style="padding-top:1px;">
+                          <span style="display:inline-block;width:22px;height:22px;background:#fff8eb;border:1px solid #fde68a;border-radius:6px;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#d97706;text-align:center;line-height:22px;">1</span>
+                        </td>
+                        <td style="padding-left:8px;">
+                          <p style="margin:0;font-size:14px;font-weight:600;color:#111111;line-height:1.4;">Search any public company</p>
+                          <p style="margin:2px 0 0;font-size:13px;color:#777777;line-height:1.5;">Enter a ticker or company name on the homepage. Results load in seconds for major companies.</p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Step 2 -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:12px;">
+                      <tr>
+                        <td width="32" valign="top" style="padding-top:1px;">
+                          <span style="display:inline-block;width:22px;height:22px;background:#fff8eb;border:1px solid #fde68a;border-radius:6px;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#d97706;text-align:center;line-height:22px;">2</span>
+                        </td>
+                        <td style="padding-left:8px;">
+                          <p style="margin:0;font-size:14px;font-weight:600;color:#111111;line-height:1.4;">Read the diff</p>
+                          <p style="margin:2px 0 0;font-size:13px;color:#777777;line-height:1.5;">See every passage that changed between filings, each scored and labeled escalating or reassuring.</p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- Step 3 -->
+                    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-bottom:32px;">
+                      <tr>
+                        <td width="32" valign="top" style="padding-top:1px;">
+                          <span style="display:inline-block;width:22px;height:22px;background:#fff8eb;border:1px solid #fde68a;border-radius:6px;font-family:'Courier New',Courier,monospace;font-size:11px;font-weight:700;color:#d97706;text-align:center;line-height:22px;">3</span>
+                        </td>
+                        <td style="padding-left:8px;">
+                          <p style="margin:0;font-size:14px;font-weight:600;color:#111111;line-height:1.4;">Watch the companies you track</p>
+                          <p style="margin:2px 0 0;font-size:13px;color:#777777;line-height:1.5;">Add tickers to your watchlist. When they next file, you will get an email before most investors notice anything changed.</p>
+                        </td>
+                      </tr>
+                    </table>
+
+                    <!-- CTA -->
+                    <table cellpadding="0" cellspacing="0" role="presentation">
+                      <tr>
+                        <td style="background:#f59e0b;border-radius:8px;">
+                          <a href="https://getfootnote.app" style="display:inline-block;padding:13px 28px;font-size:14px;font-weight:700;color:#111111;text-decoration:none;letter-spacing:0.01em;">Search your first ticker</a>
+                        </td>
+                      </tr>
+                    </table>
+
+                  </td>
+                </tr>
+              </table>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="padding:28px 8px 0;">
+              <p style="margin:0 0 6px;font-size:12px;line-height:1.6;color:#999999;">
+                You signed up for Footnote. You can manage your account at
+                <a href="https://getfootnote.app" style="color:#999999;">getfootnote.app</a>.
+              </p>
+              <p style="margin:0;font-size:12px;line-height:1.6;color:#bbbbbb;">
+                Questions? Reply to this email and Mitchell will get back to you.
+              </p>
+            </td>
+          </tr>
+
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
-</html>
-  `.trim();
+</html>`.trim();
 }
