@@ -858,8 +858,15 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   // Shared handler for recompute and verify — updates state with the returned diff.
   const _applyUpdatedDiff = (updated: DiffResult) => {
     const cacheKey = buildCacheKey(data!.ticker, data!.filing_type, data!.date_new, data!.date_old);
-    // Allow auto-scoring to re-fire if this update introduced new unscored passages
-    autoScoredRef.current.delete(cacheKey);
+    // Only reset the auto-score guard when the update actually contains unscored passages
+    // so score-more fires to pick them up. If verify already scored everything (full
+    // rescore path), leave the guard in place — no need for another scoreMore call.
+    const hasUnscored = Object.values(updated.sections ?? {}).some((diff) =>
+      (diff as SectionDiff).changed_passages.some(
+        (p) => p.score === null && p.explanation === null
+      )
+    );
+    if (hasUnscored) autoScoredRef.current.delete(cacheKey);
     _diffCache.set(cacheKey, updated);
     setData(updated);
     const allP = Object.entries(updated.sections ?? {})
