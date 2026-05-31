@@ -60,7 +60,6 @@ export default function Home() {
   const [watchlistLoading, setWatchlistLoading] = useState(true);
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
   const { isSignedIn, isLoaded: clerkLoaded } = useUser();
 
   const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(pathname)}`;
