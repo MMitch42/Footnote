@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     if (email) {
       try {
         await resend.emails.send({
-          from: "Mitchell at Footnote <mitchell@getfootnote.app>",
+          from: "Mitchell at Footnote <onboarding@resend.dev>",
           to:   email,
           subject: "Welcome to Footnote",
           html: buildWelcomeEmail(firstName),

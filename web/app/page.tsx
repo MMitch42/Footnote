@@ -61,6 +61,10 @@ export default function Home() {
   const router = useRouter();
   const { isSignedIn, isLoaded: clerkLoaded } = useUser();
 
+  // True once we know both (a) who the user is and (b) what plan they're on.
+  // Until then we show skeletons instead of the wrong content.
+  const isReady = clerkLoaded && plan !== null;
+
   useEffect(() => {
     if (!clerkLoaded) return;
     if (!isSignedIn) { setPlan("free"); return; }
@@ -336,10 +340,10 @@ export default function Home() {
           className="absolute inset-0 pointer-events-none"
           style={{ background: "radial-gradient(ellipse 90% 60% at 50% -5%, rgba(245,158,11,0.09) 0%, transparent 65%)" }}
         />
-        <div className={`relative z-10 max-w-5xl mx-auto px-6 ${isSignedIn ? "pt-6 pb-6" : "pt-20 pb-16"}`}>
+        <div className={`relative z-10 max-w-5xl mx-auto px-6 ${isReady && isSignedIn ? "pt-6 pb-6" : isReady ? "pt-20 pb-16" : "pt-6 pb-6"}`}>
 
           {/* Marketing heading — signed-out only */}
-          {!isSignedIn && (
+          {isReady && !isSignedIn && (
             <>
               <h1 className="font-mono text-4xl font-bold text-text-primary leading-tight mb-5 max-w-xl whitespace-pre-line">
                 {typed}{!typingDone && <span className="text-accent animate-pulse">_</span>}
@@ -424,8 +428,35 @@ export default function Home() {
 
       <div className="max-w-5xl mx-auto px-6">
 
+        {/* ── Loading skeleton — shown while Clerk hydrates or plan is fetching ── */}
+        {!isReady && (
+          <div className="py-8 space-y-6 animate-pulse">
+            {/* Watchlist row skeleton */}
+            <div className="border-b border-bg-border pb-8">
+              <div className="flex items-center justify-between mb-4">
+                <div className="h-3 w-24 bg-bg-surface rounded" />
+                <div className="h-3 w-16 bg-bg-surface rounded" />
+              </div>
+              <div className="flex gap-2">
+                {[72, 56, 64, 48].map((w, i) => (
+                  <div key={i} className="h-9 rounded-lg bg-bg-surface" style={{ width: w, opacity: 1 - i * 0.2 }} />
+                ))}
+              </div>
+            </div>
+            {/* Recent feed skeleton */}
+            <div>
+              <div className="h-4 w-40 bg-bg-surface rounded mb-4" />
+              <div className="rounded-xl border border-bg-border overflow-hidden divide-y divide-bg-border">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="h-12 bg-bg-surface" style={{ opacity: 1 - i * 0.18 }} />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* ── Watchlist panel — dashboard only ─────────────────── */}
-        {isSignedIn && (
+        {isReady && isSignedIn && (
           <div className="py-8 border-b border-bg-border">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2">
@@ -501,7 +532,7 @@ export default function Home() {
         )}
 
         {/* ── Recent changes feed — signed-in dashboard position ── */}
-        {isSignedIn && (feedLoading || recentFeed.length > 0) && (
+        {isReady && isSignedIn && (feedLoading || recentFeed.length > 0) && (
           <div className="py-10">
             <div className="mb-6">
               <h2 className="text-base font-semibold text-text-primary flex items-center gap-2.5">
@@ -536,7 +567,7 @@ export default function Home() {
         )}
 
         {/* ── Signal / Alpha stats — hidden for Pro/Research ───── */}
-        {(plan !== "pro" && plan !== "research") && (
+        {isReady && (plan !== "pro" && plan !== "research") && (
           <div ref={statsRef} className="border-t border-bg-border py-14 grid grid-cols-1 sm:grid-cols-2 gap-10">
             <div>
               <p className="font-mono text-5xl font-bold text-text-primary mb-1 tabular-nums">
@@ -634,7 +665,7 @@ export default function Home() {
         )}
 
         {/* How it works — marketing only */}
-        {!isSignedIn && <div ref={howRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+        {isReady && !isSignedIn && <div ref={howRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-100 ${howInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <p className="text-xs font-medium text-text-muted uppercase tracking-wide mb-3">How it works</p>
           <p className="text-sm text-text-secondary mb-10 max-w-lg">
             Built for investors, analysts, and anyone who tracks public companies. No more manually reading filings to see what changed.
@@ -653,7 +684,7 @@ export default function Home() {
         </div>}
 
         {/* ── Recent filing changes feed — signed-out position ─── */}
-        {!isSignedIn && (feedLoading || recentFeed.length > 0) && (
+        {isReady && !isSignedIn && (feedLoading || recentFeed.length > 0) && (
           <div className="border-t border-bg-border py-14">
             <div className="flex items-center gap-3 mb-6">
               <div className="flex items-center gap-1.5">
@@ -678,7 +709,7 @@ export default function Home() {
         )}
 
         {/* Real example — marketing only */}
-        {!isSignedIn && <div ref={demoRef} className={`border-t border-bg-border py-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+        {isReady && !isSignedIn && <div ref={demoRef} className={`border-t border-bg-border py-14 transition-all duration-700 ${demoInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
           <div className="flex items-center gap-3 mb-2">
             <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Real example</span>
             <div className="h-px flex-1 bg-bg-border" />
@@ -732,8 +763,8 @@ export default function Home() {
         </div>}
 
         {/* Bottom CTA — adapts to auth state */}
-        <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-150 ${waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
-          {isSignedIn ? (
+        <div id="waitlist" ref={waitlistRef} className={`border-t border-bg-border py-14 transition-all duration-700 delay-150 ${isReady && waitlistInView ? "opacity-100 translate-y-0" : "opacity-0 translate-y-5"}`}>
+          {isReady && isSignedIn ? (
             /* Signed-in: show upgrade nudge (free) or nothing (pro) */
             plan === "free" ? (
               <div className="max-w-lg">
@@ -750,7 +781,7 @@ export default function Home() {
                 </a>
               </div>
             ) : null
-          ) : (
+          ) : isReady ? (
             /* Signed-out: marketing CTAs */
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-10 max-w-2xl">
               <div>
@@ -788,7 +819,7 @@ export default function Home() {
                 )}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
 
       </div>{/* /max-w-5xl */}
