@@ -435,8 +435,8 @@ function AnalysisPanel({
                       </p>
                     </div>
                     <div className="flex gap-1.5 shrink-0">
-                      {sEsc > 0 && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-rem/30 text-diff-rem-text">↑ {sEsc}</span>}
-                      {sRea > 0 && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-add/30 text-diff-add-text">↓ {sRea}</span>}
+                      {sEsc > 0 && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-rem/30 text-diff-rem-text">{sEsc} ↑</span>}
+                      {sRea > 0 && <span className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-diff-add/30 text-diff-add-text">{sRea} ↓</span>}
                     </div>
                   </div>
                 );
@@ -852,6 +852,8 @@ export function DiffPageClient({ params }: { params: Promise<{ ticker: string }>
   // Shared handler for recompute and verify — updates state with the returned diff.
   const _applyUpdatedDiff = (updated: DiffResult) => {
     const cacheKey = buildCacheKey(data!.ticker, data!.filing_type, data!.date_new, data!.date_old);
+    // Allow auto-scoring to re-fire if this update introduced new unscored passages
+    autoScoredRef.current.delete(cacheKey);
     _diffCache.set(cacheKey, updated);
     setData(updated);
     const allP = Object.entries(updated.sections ?? {})

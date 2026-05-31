@@ -193,7 +193,7 @@ export async function GET(req: Request) {
         : `${userSummaries.length} ticker${userSummaries.length !== 1 ? "s" : ""} had filing activity this week`;
 
       await resend.emails.send({
-        from: "Footnote <onboarding@resend.dev>",
+        from: "Footnote <digest@getfootnote.app>",
         to: email,
         subject,
         html: buildDigestEmail({ summaries: userSummaries }),
@@ -281,7 +281,7 @@ export async function GET(req: Request) {
 
       try {
         await resend.emails.send({
-          from: "Footnote <onboarding@resend.dev>",
+          from: "Footnote <digest@getfootnote.app>",
           to: userEmail,
           subject,
           html: buildFreeDigestEmail({ topFilings }),

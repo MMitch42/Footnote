@@ -132,8 +132,7 @@ export async function GET(req: Request) {
       // Send alert
       const appUrl = process.env.APP_URL ?? "https://getfootnote.app";
       await resend.emails.send({
-        // TODO: replace sender once your domain is verified in Resend
-        from: "Footnote <onboarding@resend.dev>",
+        from: "Footnote <alerts@getfootnote.app>",
         to: email,
         subject: `${diff.company_name ?? diff.ticker} (${diff.ticker}) · ${diff.filing_type}: ${triggered.length} change${triggered.length !== 1 ? "s" : ""} above your threshold`,
         html: buildAlertEmail({ diff, passages: triggered, appUrl }),
