@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef } from "react";
-import { useRouter, usePathname, useSearchParams } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { Show, UserButton, useUser } from "@clerk/nextjs";
 import { toggleFeatureLauncher, openFeatureLauncherFeedback } from "@/lib/featureLauncherStore";
 
@@ -63,11 +63,8 @@ export default function Home() {
   const searchParams = useSearchParams();
   const { isSignedIn, isLoaded: clerkLoaded } = useUser();
 
-  const currentUrl = searchParams.toString()
-    ? `${pathname}?${searchParams.toString()}`
-    : pathname;
-  const signInUrl  = `/sign-in?redirect_url=${encodeURIComponent(currentUrl)}`;
-  const signUpUrl  = `/sign-up?redirect_url=${encodeURIComponent(currentUrl)}`;
+  const signInUrl = `/sign-in?redirect_url=${encodeURIComponent(pathname)}`;
+  const signUpUrl = `/sign-up?redirect_url=${encodeURIComponent(pathname)}`;
 
   // True once we know both (a) who the user is and (b) what plan they're on.
   // Until then we show skeletons instead of the wrong content.
