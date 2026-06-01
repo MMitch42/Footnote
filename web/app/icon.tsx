@@ -8,7 +8,7 @@ export const contentType = "image/png";
 async function loadCursiveFont(): Promise<ArrayBuffer | null> {
   try {
     const css = await fetch(
-      "https://fonts.googleapis.com/css?family=Dancing+Script:700"
+      "https://fonts.googleapis.com/css?family=Satisfy"
     ).then((r) => r.text());
     const url = css.match(/url\((https:\/\/fonts\.gstatic\.com\/[^)]+)\)/)?.[1];
     if (!url) return null;
@@ -37,11 +37,8 @@ export default async function Icon() {
           style={{
             color: "#f59e0b",
             fontSize: 16,
-            fontWeight: 700,
-            fontFamily: fontData ? "'Dancing Script'" : "serif",
+            fontFamily: fontData ? "'Satisfy'" : "serif",
             lineHeight: 1,
-            marginTop: 3,
-            marginLeft: 1,
           }}
         >
           fn
@@ -51,7 +48,7 @@ export default async function Icon() {
     {
       ...size,
       ...(fontData
-        ? { fonts: [{ name: "Dancing Script", data: fontData, weight: 700 }] }
+        ? { fonts: [{ name: "Satisfy", data: fontData }] }
         : {}),
     }
   );
